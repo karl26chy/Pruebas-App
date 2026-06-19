@@ -1,0 +1,12 @@
+{
+  "name": "platform-api",
+  "version": "1.0.0",
+  "description": "Mock API for school platform",
+  "main": "index.js",
+  "scripts": {
+    "server": "json-server --watch db.json --port 5000"
+  },
+  "dependencies": {
+    "json-server": "^0.17.4"
+  }
+}
