@@ -12,7 +12,7 @@ import {
   BarChart3, PieChart as PieChartIcon, Search, X, Phone, User as UserIcon,
   Heart, AlertCircle, CreditCard, Droplet
 } from 'lucide-react';
-import { exportToPDF, exportToExcel } from '../services/export';
+import { exportToPDF, exportToExcel, exportBoletinToPDF } from '../services/export';
 
 const COLORS = ['#4f46e5', '#06b6d4', '#f59e0b', '#ef4444', '#10b981', '#8b5cf6', '#ec4899'];
 
@@ -162,6 +162,42 @@ export const AdminDashboard: React.FC = () => {
     if (atts.length === 0) return 0;
     const present = atts.filter(a => a.estado === 'presente').length;
     return Math.round((present / atts.length) * 100);
+  };
+
+  const buildBoletinData = (student: User) => {
+    const studentMarks = marks.filter(m => m.estudiante_id === student.id);
+    const boletinMaterias = subjects
+      .map(subj => {
+        const subjMarks = studentMarks.filter(m => m.materia_id === subj.id);
+        if (subjMarks.length === 0) return null;
+        const avg = Number((subjMarks.reduce((a, m) => a + m.nota, 0) / subjMarks.length).toFixed(2));
+        const passing = currentInstitution ? avg >= currentInstitution.nota_minima_aprobacion : true;
+        return { nombre: subj.nombre, evaluaciones: subjMarks.length, promedio: avg, estado: passing ? 'Aprobado' : 'Reprobado' };
+      })
+      .filter((m): m is NonNullable<typeof m> => m !== null);
+    const studentAtt = attendance.filter(a => a.estudiante_id === student.id);
+    const ausencias = studentAtt.filter(a => a.estado === 'ausente').length;
+    const tardanzas = studentAtt.filter(a => a.estado === 'tardanza').length;
+    const slug = `${student.nombre}_${student.apellido}`.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+    return {
+      institucion: currentInstitution?.nombre || '',
+      estudiante: `${student.nombre} ${student.apellido}`,
+      identificacion: student.identificacion || 'N/R',
+      grado: getStudentGradeLabel(student.id),
+      edad: getAge(student.fecha_nacimiento),
+      genero: student.genero || 'N/E',
+      materias: boletinMaterias,
+      promedioGeneral: getStudentAverage(student.id),
+      notaMinima: currentInstitution?.nota_minima_aprobacion ?? 0,
+      asistenciaTasa: getStudentAttendanceRate(student.id),
+      ausencias,
+      tardanzas,
+      fileName: `boletin_${slug}`,
+    };
+  };
+
+  const exportSingleBoletin = (student: User) => {
+    exportBoletinToPDF(buildBoletinData(student));
   };
 
   const studentChartData = useMemo(() => {
@@ -433,9 +469,18 @@ export const AdminDashboard: React.FC = () => {
                           <p className="text-white/80 text-sm">{getStudentGradeLabel(selectedStudent.id)}</p>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <div className="text-white/70 text-xs">Promedio General</div>
-                        <div className="text-2xl font-bold">{getStudentAverage(selectedStudent.id)}</div>
+                      <div className="flex items-start gap-4">
+                        <div className="text-right">
+                          <div className="text-white/70 text-xs">Promedio General</div>
+                          <div className="text-2xl font-bold">{getStudentAverage(selectedStudent.id)}</div>
+                        </div>
+                        <button
+                          onClick={() => exportSingleBoletin(selectedStudent)}
+                          title="Exportar boletín de este estudiante a PDF"
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-white/20 hover:bg-white/30 text-white rounded-lg text-xs font-medium transition-colors"
+                        >
+                          <FileText className="h-3.5 w-3.5" /> Informes
+                        </button>
                       </div>
                     </div>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-5 pt-4 border-t border-white/20">
