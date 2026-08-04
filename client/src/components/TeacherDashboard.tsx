@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { api } from '../services/api';
+import type { Message, Evaluation } from '../types';
 import { 
   CheckSquare, Award, AlertTriangle, Send, Mail, Inbox, Calendar,
   FileText, FileSpreadsheet, Reply, Plus, Trash2, Edit3, ClipboardList
@@ -10,7 +11,8 @@ import { exportToPDF, exportToExcel } from '../services/export';
 export const TeacherDashboard: React.FC = () => {
   const { 
     user, grades, subjects, assignments, studentGrades, 
-    users, citations, messages, evaluations, refreshData, navigateToTab, setNavigateToTab 
+    users, citations, messages, evaluations, marks, currentInstitution,
+    refreshData, navigateToTab, setNavigateToTab 
   } = useApp();
 
   const [selectedAssignId, setSelectedAssignId] = useState('');
@@ -40,12 +42,12 @@ export const TeacherDashboard: React.FC = () => {
   const [msgStudentId, setMsgStudentId] = useState('');
   const [msgSubject, setMsgSubject] = useState('');
   const [msgBody, setMsgBody] = useState('');
-  const [msgReplyTo, setMsgReplyTo] = useState<any>(null);
-  const [selectedMessage, setSelectedMessage] = useState<any>(null);
+  const [msgReplyTo, setMsgReplyTo] = useState<Message | null>(null);
+  const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
 
   useEffect(() => {
-    if (navigateToTab === 'messages') {
-      setActiveSubTab('messages');
+    if (navigateToTab && typeof navigateToTab === 'string') {
+      setActiveSubTab(navigateToTab as typeof activeSubTab);
       setNavigateToTab(null);
     }
   }, [navigateToTab, setNavigateToTab]);
@@ -80,6 +82,16 @@ export const TeacherDashboard: React.FC = () => {
   const activeEvals = evaluations.filter(e => 
     activeAssignment && e.materia_id === activeAssignment.materia_id && e.grado_id === activeAssignment.grado_id
   );
+
+  // Marks: existing records for the selected evaluation + scale by institution
+  const notaMax = currentInstitution?.tipo === 'universidad' ? 5 : 10;
+  const existingMarksForEval = marks.filter(m =>
+    selectedEvalId && m.evaluacion_id === selectedEvalId
+  );
+  const savedMarksByStudent: { [studentId: string]: number } = {};
+  existingMarksForEval.forEach(m => { savedMarksByStudent[m.estudiante_id] = m.nota; });
+  const getMarkValue = (studentId: string): number =>
+    markRecords[studentId] ?? savedMarksByStudent[studentId] ?? 0;
 
   // Attendance
   const handleSaveAttendance = async (e: React.FormEvent) => {
@@ -127,7 +139,7 @@ export const TeacherDashboard: React.FC = () => {
     } catch { alert('Error al guardar evaluación'); }
   };
 
-  const handleEditEvaluation = (ev: any) => {
+  const handleEditEvaluation = (ev: Evaluation) => {
     setEditingEvalId(ev.id);
     setEvalNombre(ev.nombre);
     setEvalFecha(ev.fecha_evaluacion);
@@ -148,15 +160,17 @@ export const TeacherDashboard: React.FC = () => {
     setEvalNombre(''); setEvalFecha(''); setEvalPorcentaje(10);
   };
 
-  // Marks - using evaluation
+  // Marks - using evaluation (upsert: actualiza si ya existe la nota del estudiante en esa evaluación)
   const handleSaveMarks = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeAssignment || !user || !selectedEvalId) return;
     const selectedEval = evaluations.find(ev => ev.id === selectedEvalId);
+    const existingByStudent: { [studentId: string]: { id: string } } = {};
+    existingMarksForEval.forEach(m => { existingByStudent[m.estudiante_id] = m; });
     try {
-      await Promise.all(gradeStudents.map(student => {
-        const score = markRecords[student.id] ?? 0.0;
-        return api.createMark({
+      await Promise.all(gradeStudents.map(async student => {
+        const score = getMarkValue(student.id);
+        const data = {
           estudiante_id: student.id,
           materia_id: activeAssignment.materia_id,
           grado_id: activeAssignment.grado_id,
@@ -167,11 +181,19 @@ export const TeacherDashboard: React.FC = () => {
           nota: Number(score),
           periodo: selectedEval?.periodo || 'Periodo 1',
           registrado_por: user.id
-        });
+        };
+        const existing = existingByStudent[student.id];
+        if (existing) {
+          await api.updateMark(existing.id, data);
+        } else {
+          await api.createMark(data);
+        }
       }));
       await refreshData();
       alert('Notas registradas con éxito');
-    } catch { alert('Error al registrar notas'); }
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Error al registrar notas');
+    }
   };
 
   // Citations
@@ -201,7 +223,7 @@ export const TeacherDashboard: React.FC = () => {
     }
   };
 
-  const handleReply = (msg: any) => {
+  const handleReply = (msg: Message) => {
     const senderIsStudent = msg.remitente_id !== user?.id;
     setMsgReplyTo(msg);
     setMsgStudentId(senderIsStudent ? msg.remitente_id : msg.destinatario_id);
@@ -424,10 +446,10 @@ export const TeacherDashboard: React.FC = () => {
                   Calificaciones - {activeSubject?.nombre} ({activeGrade?.nombre})
                 </h3>
                 <div className="flex gap-2">
-                  <button onClick={() => exportToPDF({ title: `Notas ${activeSubject?.nombre}`, headers: ['Estudiante', 'Nota'], rows: gradeStudents.map(s => [`${s.nombre} ${s.apellido}`, markRecords[s.id] ?? 0]), fileName: `notas_${activeSubject?.nombre?.toLowerCase().replace(/\s+/g, '_')}` })} className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg text-xs font-medium transition-colors">
+                  <button onClick={() => exportToPDF({ title: `Notas ${activeSubject?.nombre}`, headers: ['Estudiante', 'Nota'], rows: gradeStudents.map(s => [`${s.nombre} ${s.apellido}`, getMarkValue(s.id)]), fileName: `notas_${activeSubject?.nombre?.toLowerCase().replace(/\s+/g, '_')}` })} className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg text-xs font-medium transition-colors">
                     <FileText className="h-3.5 w-3.5" /> PDF
                   </button>
-                  <button onClick={() => exportToExcel({ title: `Notas ${activeSubject?.nombre}`, headers: ['Estudiante', 'Nota'], rows: gradeStudents.map(s => [`${s.nombre} ${s.apellido}`, markRecords[s.id] ?? 0]), fileName: `notas_${activeSubject?.nombre?.toLowerCase().replace(/\s+/g, '_')}` })} className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg text-xs font-medium transition-colors">
+                  <button onClick={() => exportToExcel({ title: `Notas ${activeSubject?.nombre}`, headers: ['Estudiante', 'Nota'], rows: gradeStudents.map(s => [`${s.nombre} ${s.apellido}`, getMarkValue(s.id)]), fileName: `notas_${activeSubject?.nombre?.toLowerCase().replace(/\s+/g, '_')}` })} className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg text-xs font-medium transition-colors">
                     <FileSpreadsheet className="h-3.5 w-3.5" /> Excel
                   </button>
                 </div>
@@ -467,13 +489,13 @@ export const TeacherDashboard: React.FC = () => {
                       </thead>
                       <tbody className="divide-y divide-gray-100 text-sm">
                         {gradeStudents.map(student => {
-                          const val = markRecords[student.id] ?? '';
+                          const val = markRecords[student.id] ?? savedMarksByStudent[student.id] ?? '';
                           return (
                             <tr key={student.id} className="hover:bg-gray-50">
                               <td className="py-3.5 font-medium text-gray-900">{student.nombre} {student.apellido}</td>
                               <td className="py-2 text-right">
                                 <input
-                                  type="number" step="0.1" min="0" max="10" required
+                                  type="number" step="0.1" min="0" max={notaMax} required
                                   value={val}
                                   onChange={e => setMarkRecords(prev => ({ ...prev, [student.id]: Number(e.target.value) }))}
                                   placeholder="0.0"

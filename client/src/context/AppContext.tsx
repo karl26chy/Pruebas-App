@@ -1,39 +1,24 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { api } from '../services/api';
+/* eslint react-refresh/only-export-components: "off" */
 
-export type Role = 'super_admin' | 'admin' | 'teacher' | 'student';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { api, setAuthToken, getAuthToken } from '../services/api';
+import type {
+  Role,
+  ContactoEmergencia,
+  User,
+  Institution,
+  Grade,
+  Subject,
+  Assignment,
+  StudentGrade,
+  Attendance,
+  Mark,
+  Citation,
+  Message,
+  Evaluation,
+} from '../types';
 
-export interface ContactoEmergencia {
-  nombre: string;
-  telefono: string;
-  relacion: string;
-}
-
-export interface User {
-  id: string;
-  email: string;
-  rol: Role;
-  nombre: string;
-  apellido: string;
-  identificacion?: string;
-  genero?: string;
-  fecha_nacimiento?: string;
-  eps?: string;
-  tipo_sangre?: string;
-  contacto_emergencia?: ContactoEmergencia;
-  discapacidad?: string;
-  institucion_id: string | null;
-  activo: boolean;
-}
-
-export interface Institution {
-  id: string;
-  nombre: string;
-  subdominio: string;
-  tipo: 'colegio' | 'universidad';
-  nota_minima_aprobacion: number;
-  activa: boolean;
-}
+export type { Role, ContactoEmergencia, User, Institution };
 
 interface AppContextType {
   user: User | null;
@@ -41,15 +26,15 @@ interface AppContextType {
   error: string | null;
   institutions: Institution[];
   users: User[];
-  grades: any[];
-  subjects: any[];
-  assignments: any[];
-  studentGrades: any[];
-  attendance: any[];
-  marks: any[];
-  citations: any[];
-  messages: any[];
-  evaluations: any[];
+  grades: Grade[];
+  subjects: Subject[];
+  assignments: Assignment[];
+  studentGrades: StudentGrade[];
+  attendance: Attendance[];
+  marks: Mark[];
+  citations: Citation[];
+  messages: Message[];
+  evaluations: Evaluation[];
   activeSubdomain: string | null;
   setSimulatedSubdomain: (subdomain: string | null) => void;
   login: (email: string, password: string) => Promise<boolean>;
@@ -84,15 +69,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // DB States
   const [institutions, setInstitutions] = useState<Institution[]>([]);
   const [users, setUsers] = useState<User[]>([]);
-  const [grades, setGrades] = useState<any[]>([]);
-  const [subjects, setSubjects] = useState<any[]>([]);
-  const [assignments, setAssignments] = useState<any[]>([]);
-  const [studentGrades, setStudentGrades] = useState<any[]>([]);
-  const [attendance, setAttendance] = useState<any[]>([]);
-  const [marks, setMarks] = useState<any[]>([]);
-  const [citations, setCitations] = useState<any[]>([]);
-  const [messages, setMessages] = useState<any[]>([]);
-  const [evaluations, setEvaluations] = useState<any[]>([]);
+  const [grades, setGrades] = useState<Grade[]>([]);
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [studentGrades, setStudentGrades] = useState<StudentGrade[]>([]);
+  const [attendance, setAttendance] = useState<Attendance[]>([]);
+  const [marks, setMarks] = useState<Mark[]>([]);
+  const [citations, setCitations] = useState<Citation[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [evaluations, setEvaluations] = useState<Evaluation[]>([]);
   const [navigateToTab, setNavigateToTab] = useState<string | null>(null);
 
   // LocalStorage keys
@@ -111,25 +96,85 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   useEffect(() => {
-    // Restore from localStorage
-    const savedUser = localStorage.getItem(USER_KEY);
-    const savedSubdomain = localStorage.getItem(SUBDOMAIN_KEY);
-    
-    if (savedUser) {
-      setUser(JSON.parse(savedUser));
-    }
-    if (savedSubdomain) {
-      setSimulatedSubdomainState(savedSubdomain);
-    }
-    
-    loadInitialData();
+    const handleUnauthorized = () => {
+      setUser(null);
+      localStorage.removeItem(USER_KEY);
+    };
+    window.addEventListener('auth:unauthorized', handleUnauthorized);
+    return () => window.removeEventListener('auth:unauthorized', handleUnauthorized);
   }, []);
 
-  const loadInitialData = async () => {
+  useEffect(() => {
+    const restoreSession = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const savedSubdomain = localStorage.getItem(SUBDOMAIN_KEY);
+        if (savedSubdomain) {
+          setSimulatedSubdomainState(savedSubdomain);
+        }
+
+        let hasSession = false;
+        const savedToken = getAuthToken();
+        if (savedToken) {
+          try {
+            const me = await api.getMe();
+            setUser(me);
+            localStorage.setItem(USER_KEY, JSON.stringify(me));
+            hasSession = true;
+          } catch {
+            setAuthToken(null);
+            localStorage.removeItem(USER_KEY);
+            setUser(null);
+          }
+        }
+
+        const instList = await api.getInstitutions();
+        setInstitutions(instList);
+
+        if (hasSession) {
+          const [userList, gradeList, subList, assignList, sgList, attList, markList, citList, msgList, evalList] =
+            await Promise.all([
+              api.getUsers(),
+              api.getGrades(),
+              api.getSubjects(),
+              api.getAssignments(),
+              api.getStudentGrades(),
+              api.getAttendance(),
+              api.getMarks(),
+              api.getCitations(),
+              api.getMessages(),
+              api.getEvaluations(),
+            ]);
+
+          setUsers(userList);
+          setGrades(gradeList);
+          setSubjects(subList);
+          setAssignments(assignList);
+          setStudentGrades(sgList);
+          setAttendance(attList);
+          setMarks(markList);
+          setCitations(citList);
+          setMessages(msgList);
+          setEvaluations(evalList);
+        }
+      } catch (err: unknown) {
+        console.error('Failed to load data from API:', err);
+        setError('No se pudo conectar con el servidor API. Verifica que el backend esté activo.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    restoreSession();
+  }, []);
+
+  const loadInitialData = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      
+
       const [
         instList,
         userList,
@@ -167,81 +212,68 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setCitations(citList);
       setMessages(msgList);
       setEvaluations(evalList);
-    } catch (err: any) {
-      console.error('Failed to load initial data from JSON Server:', err);
-      setError('No se pudo conectar con el servidor API. Verifica que npm run server esté activo.');
+    } catch (err: unknown) {
+      console.error('Failed to load initial data:', err);
+      setError('No se pudo conectar con el servidor API. Verifica que el backend esté activo.');
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const refreshData = async () => {
+  const refreshData = useCallback(async () => {
     await loadInitialData();
-  };
+  }, [loadInitialData]);
 
   const currentInstitution = institutions.find(inst => inst.subdominio === activeSubdomain) || null;
 
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
       setError(null);
-      // Wait for a fresh list of users in case one was just created
-      const freshUsers = await api.getUsers();
-      setUsers(freshUsers);
+      const { token, user } = await api.login(email, password);
+      setAuthToken(token);
 
-      const foundUser = freshUsers.find(
-        u => u.email.toLowerCase() === email.toLowerCase() && u.password === password
-      );
+      const userInstitution = institutions.find(inst => inst.id === user.institucion_id);
 
-      if (!foundUser) {
-        setError('Credenciales inválidas. Inténtalo de nuevo.');
-        return false;
-      }
-
-      if (!foundUser.activo) {
-        setError('Tu cuenta está desactivada. Contacta al administrador.');
-        return false;
-      }
-
-      // If user is not super_admin, they must match the active institution
-      if (foundUser.rol !== 'super_admin') {
-        const userInstitution = institutions.find(inst => inst.id === foundUser.institucion_id);
-        
-        // If we are simulating or reading a subdomain, check if it matches
+      if (user.rol !== 'super_admin') {
         if (activeSubdomain && userInstitution?.subdominio !== activeSubdomain) {
           setError(`Este usuario pertenece a ${userInstitution?.nombre || 'otra institución'} y no al subdominio actual.`);
+          setAuthToken(null);
+          setUser(null);
           return false;
         }
 
-        // Check if institution is active
         if (userInstitution && !userInstitution.activa) {
           setError('La institución asociada está desactivada.');
+          setAuthToken(null);
+          setUser(null);
           return false;
         }
 
-        // If there's no active subdomain on localhost, auto-select the user's subdomain
         if (!activeSubdomain && userInstitution) {
           setSimulatedSubdomain(userInstitution.subdominio);
         }
       } else {
-        // Super admin cannot log in to an institution subdomain directly, or rather they manage all.
-        // It's recommended to view it under superadmin context
         if (activeSubdomain) {
           setError('El Super Administrador solo puede iniciar sesión en el portal general/administración.');
+          setAuthToken(null);
+          setUser(null);
           return false;
         }
       }
 
-      setUser(foundUser);
-      localStorage.setItem(USER_KEY, JSON.stringify(foundUser));
+      setUser(user);
+      localStorage.setItem(USER_KEY, JSON.stringify(user));
+      await loadInitialData();
       return true;
-    } catch (err) {
-      setError('Error al intentar iniciar sesión.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Error al intentar iniciar sesión.');
       return false;
     }
   };
 
   const logout = () => {
     setUser(null);
+    setAuthToken(null);
     localStorage.removeItem(USER_KEY);
     // Don't clear simulatedSubdomain so the user remains on the same virtual subdomain for testing
   };

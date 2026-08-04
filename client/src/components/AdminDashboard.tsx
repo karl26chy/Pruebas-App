@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { useApp } from '../context/AppContext';
 import type { User } from '../context/AppContext';
 import { 
@@ -6,7 +6,6 @@ import {
   CartesianGrid, Tooltip, Legend, ReferenceLine, PieChart, Pie, Cell
 } from 'recharts';
 import { 
-  Users, BookOpen, GraduationCap,
   LayoutDashboard, ShieldAlert,
   FileText, FileSpreadsheet, Filter, Eye, CheckCircle, XCircle, Clock,
   BarChart3, PieChart as PieChartIcon, Search, X, Phone, User as UserIcon,
@@ -16,10 +15,21 @@ import { exportToPDF, exportToExcel, exportBoletinToPDF } from '../services/expo
 
 const COLORS = ['#4f46e5', '#06b6d4', '#f59e0b', '#ef4444', '#10b981', '#8b5cf6', '#ec4899'];
 
+const weightedAverage = (marksList: { nota: number; porcentaje?: number }[]): number => {
+  if (marksList.length === 0) return 0;
+  const totalWeighted = marksList.reduce((acc, m) => acc + m.nota * (m.porcentaje || 0), 0);
+  const totalWeight = marksList.reduce((acc, m) => acc + (m.porcentaje || 0), 0);
+  const avg =
+    totalWeight > 0
+      ? totalWeighted / totalWeight
+      : marksList.reduce((a, m) => a + m.nota, 0) / marksList.length;
+  return Number(avg.toFixed(2));
+};
+
 export const AdminDashboard: React.FC = () => {
   const { 
-    currentInstitution, users, grades, subjects, assignments, 
-    studentGrades, marks, attendance, refreshData 
+    currentInstitution, users, grades, subjects, 
+    studentGrades, marks, attendance 
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<'overview' | 'students'>('overview');
@@ -44,38 +54,42 @@ export const AdminDashboard: React.FC = () => {
 
   const instUsers = users.filter(u => u.institucion_id === currentInstitution?.id);
   const instGrades = grades.filter(g => g.institucion_id === currentInstitution?.id);
-  const instAssignments = assignments.filter(a => a.institucion_id === currentInstitution?.id);
 
   const studentUsers = instUsers.filter(u => u.rol === 'student');
   const teacherUsers = instUsers.filter(u => u.rol === 'teacher');
 
-  const getGradeLabel = (gradeId: string) => {
-    const g = grades.find(g => g.id === gradeId);
-    return g ? `${g.nombre} "${g.tipo_grado}"` : 'Desconocido';
-  };
-
-  const getSubjectName = (subjId: string) => subjects.find(s => s.id === subjId)?.nombre || 'Materia';
+  const getSubjectName = useCallback(
+    (subjId: string) => subjects.find(s => s.id === subjId)?.nombre || 'Materia',
+    [subjects]
+  );
 
   const getLowPerformingSubjects = () => {
     if (!currentInstitution) return [];
-    const subjectStats: { [key: string]: { total: number; count: number; name: string } } = {};
     const instStudentIds = studentUsers.map(s => s.id);
     const instMarks = marks.filter(m => instStudentIds.includes(m.estudiante_id));
+    const subjectStats: { [key: string]: { weighted: number; weight: number; fallback: number; count: number; name: string } } = {};
     instMarks.forEach(m => {
       const subject = subjects.find(s => s.id === m.materia_id);
       if (!subject) return;
       if (!subjectStats[m.materia_id]) {
-        subjectStats[m.materia_id] = { total: 0, count: 0, name: subject.nombre };
+        subjectStats[m.materia_id] = { weighted: 0, weight: 0, fallback: 0, count: 0, name: subject.nombre };
       }
-      subjectStats[m.materia_id].total += m.nota;
+      const pct = m.porcentaje || 0;
+      subjectStats[m.materia_id].weighted += m.nota * pct;
+      subjectStats[m.materia_id].weight += pct;
+      subjectStats[m.materia_id].fallback += m.nota;
       subjectStats[m.materia_id].count += 1;
     });
-    return Object.keys(subjectStats).map(subjId => ({
-      id: subjId,
-      nombre: subjectStats[subjId].name,
-      promedio: Number((subjectStats[subjId].total / subjectStats[subjId].count).toFixed(2)),
-      deficit: subjectStats[subjId].total / subjectStats[subjId].count < currentInstitution.nota_minima_aprobacion
-    })).sort((a, b) => a.promedio - b.promedio).slice(0, 5);
+    return Object.keys(subjectStats).map(subjId => {
+      const s = subjectStats[subjId];
+      const avg = s.weight > 0 ? s.weighted / s.weight : (s.count ? s.fallback / s.count : 0);
+      return {
+        id: subjId,
+        nombre: s.name,
+        promedio: Number(avg.toFixed(2)),
+        deficit: avg < currentInstitution.nota_minima_aprobacion
+      };
+    }).sort((a, b) => a.promedio - b.promedio).slice(0, 5);
   };
 
   const lowPerfSubjects = getLowPerformingSubjects();
@@ -83,17 +97,24 @@ export const AdminDashboard: React.FC = () => {
   const overallSubjectData = useMemo(() => {
     const instStudentIds = studentUsers.map(s => s.id);
     const instMarks = marks.filter(m => instStudentIds.includes(m.estudiante_id));
-    const map: { [subjId: string]: { total: number; count: number } } = {};
+    const map: { [subjId: string]: { weighted: number; weight: number; fallback: number; count: number } } = {};
     instMarks.forEach(m => {
-      if (!map[m.materia_id]) map[m.materia_id] = { total: 0, count: 0 };
-      map[m.materia_id].total += m.nota;
+      if (!map[m.materia_id]) map[m.materia_id] = { weighted: 0, weight: 0, fallback: 0, count: 0 };
+      const pct = m.porcentaje || 0;
+      map[m.materia_id].weighted += m.nota * pct;
+      map[m.materia_id].weight += pct;
+      map[m.materia_id].fallback += m.nota;
       map[m.materia_id].count += 1;
     });
-    return Object.keys(map).map(id => ({
-      name: getSubjectName(id),
-      Promedio: Number((map[id].total / map[id].count).toFixed(2))
-    }));
-  }, [marks, studentUsers, subjects]);
+    return Object.keys(map).map(id => {
+      const d = map[id];
+      const avg = d.weight > 0 ? d.weighted / d.weight : (d.count ? d.fallback / d.count : 0);
+      return {
+        name: getSubjectName(id),
+        Promedio: Number(avg.toFixed(2))
+      };
+    });
+  }, [marks, studentUsers, getSubjectName]);
 
   const attendancePieData = useMemo(() => {
     const instStudentIds = studentUsers.map(s => s.id);
@@ -153,8 +174,7 @@ export const AdminDashboard: React.FC = () => {
   const getStudentAverage = (studId: string, subjId?: string) => {
     let studentMarks = marks.filter(m => m.estudiante_id === studId);
     if (subjId) studentMarks = studentMarks.filter(m => m.materia_id === subjId);
-    if (studentMarks.length === 0) return 0;
-    return Number((studentMarks.reduce((acc, m) => acc + m.nota, 0) / studentMarks.length).toFixed(2));
+    return weightedAverage(studentMarks);
   };
 
   const getStudentAttendanceRate = (studId: string) => {
@@ -170,7 +190,7 @@ export const AdminDashboard: React.FC = () => {
       .map(subj => {
         const subjMarks = studentMarks.filter(m => m.materia_id === subj.id);
         if (subjMarks.length === 0) return null;
-        const avg = Number((subjMarks.reduce((a, m) => a + m.nota, 0) / subjMarks.length).toFixed(2));
+        const avg = weightedAverage(subjMarks);
         const passing = currentInstitution ? avg >= currentInstitution.nota_minima_aprobacion : true;
         return { nombre: subj.nombre, evaluaciones: subjMarks.length, promedio: avg, estado: passing ? 'Aprobado' : 'Reprobado' };
       })
@@ -202,20 +222,27 @@ export const AdminDashboard: React.FC = () => {
 
   const studentChartData = useMemo(() => {
     if (!selectedStudent) return [];
-    const dataMap: { [subjId: string]: { name: string; nota: number; count: number } } = {};
+    const dataMap: { [subjId: string]: { name: string; weighted: number; weight: number; fallback: number; count: number } } = {};
     const studentMarks = marks.filter(m => m.estudiante_id === selectedStudent.id);
     studentMarks.forEach(m => {
       if (!dataMap[m.materia_id]) {
-        dataMap[m.materia_id] = { name: getSubjectName(m.materia_id), nota: 0, count: 0 };
+        dataMap[m.materia_id] = { name: getSubjectName(m.materia_id), weighted: 0, weight: 0, fallback: 0, count: 0 };
       }
-      dataMap[m.materia_id].nota += m.nota;
+      const pct = m.porcentaje || 0;
+      dataMap[m.materia_id].weighted += m.nota * pct;
+      dataMap[m.materia_id].weight += pct;
+      dataMap[m.materia_id].fallback += m.nota;
       dataMap[m.materia_id].count += 1;
     });
-    return Object.keys(dataMap).map(subjId => ({
-      name: dataMap[subjId].name,
-      'Nota Promedio': Number((dataMap[subjId].nota / dataMap[subjId].count).toFixed(2))
-    }));
-  }, [selectedStudent, marks, subjects]);
+    return Object.keys(dataMap).map(subjId => {
+      const d = dataMap[subjId];
+      const avg = d.weight > 0 ? d.weighted / d.weight : (d.count ? d.fallback / d.count : 0);
+      return {
+        name: d.name,
+        'Nota Promedio': Number(avg.toFixed(2))
+      };
+    });
+  }, [selectedStudent, marks, getSubjectName]);
 
   const selectStudent = (s: User) => {
     setSelectedStudent(s);
@@ -578,7 +605,7 @@ export const AdminDashboard: React.FC = () => {
                           {subjects.map(subj => {
                             const studentMarks = marks.filter(m => m.estudiante_id === selectedStudent.id && m.materia_id === subj.id);
                             if (studentMarks.length === 0) return null;
-                            const avg = Number((studentMarks.reduce((a, m) => a + m.nota, 0) / studentMarks.length).toFixed(2));
+                            const avg = weightedAverage(studentMarks);
                             const passing = currentInstitution ? avg >= currentInstitution.nota_minima_aprobacion : true;
                             return (
                               <tr key={subj.id} className="hover:bg-gray-50">

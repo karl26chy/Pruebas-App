@@ -1,151 +1,163 @@
-const API_BASE = 'http://localhost:5000';
+import type {
+  LoginResponse,
+  User,
+  Institution,
+  Grade,
+  Subject,
+  Assignment,
+  StudentGrade,
+  Attendance,
+  Mark,
+  Citation,
+  Message,
+  Evaluation,
+} from '../types';
 
-export async function apiFetch<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+const API_BASE =
+  (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/+$/, '') || '/api';
+
+const TOKEN_KEY = 'edu_platform_token';
+
+export function getAuthToken(): string | null {
+  return localStorage.getItem(TOKEN_KEY);
+}
+
+export function setAuthToken(token: string | null) {
+  if (token) {
+    localStorage.setItem(TOKEN_KEY, token);
+  } else {
+    localStorage.removeItem(TOKEN_KEY);
+  }
+}
+
+async function apiFetch<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const url = `${API_BASE}${endpoint}`;
+  const token = getAuthToken();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(options.headers as Record<string, string> | undefined),
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
   const response = await fetch(url, {
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
     ...options,
+    headers,
   });
 
+  if (response.status === 401) {
+    setAuthToken(null);
+    window.dispatchEvent(new Event('auth:unauthorized'));
+    throw new Error('Sesión expirada o inválida. Inicia sesión de nuevo.');
+  }
+
   if (!response.ok) {
-    throw new Error(`API error: ${response.status} ${response.statusText}`);
+    let message = `API error: ${response.status} ${response.statusText}`;
+    try {
+      const data = await response.json();
+      if (data?.error) message = data.error;
+    } catch {
+      // ignore parse errors
+    }
+    throw new Error(message);
   }
 
   return response.json();
 }
 
 export const api = {
+  // Auth
+  login: (email: string, password: string) =>
+    apiFetch<LoginResponse>('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    }),
+  getMe: () => apiFetch<User>('/auth/me'),
+
   // Institutions
-  getInstitutions: () => apiFetch<any[]>('/institutions'),
-  getInstitution: (id: string) => apiFetch<any>(`/institutions/${id}`),
-  createInstitution: (data: any) => apiFetch<any>('/institutions', {
-    method: 'POST',
-    body: JSON.stringify(data),
-  }),
-  updateInstitution: (id: string, data: any) => apiFetch<any>(`/institutions/${id}`, {
-    method: 'PUT',
-    body: JSON.stringify(data),
-  }),
-  deleteInstitution: (id: string) => apiFetch<any>(`/institutions/${id}`, {
-    method: 'DELETE',
-  }),
+  getInstitutions: () => apiFetch<Institution[]>('/institutions'),
+  getInstitution: (id: string) => apiFetch<Institution>(`/institutions/${id}`),
+  createInstitution: (data: Partial<Institution>) =>
+    apiFetch<Institution>('/institutions', { method: 'POST', body: JSON.stringify(data) }),
+  updateInstitution: (id: string, data: Partial<Institution>) =>
+    apiFetch<Institution>(`/institutions/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteInstitution: (id: string) =>
+    apiFetch<Institution>(`/institutions/${id}`, { method: 'DELETE' }),
 
   // Users
-  getUsers: () => apiFetch<any[]>('/users'),
-  createUser: (data: any) => apiFetch<any>('/users', {
-    method: 'POST',
-    body: JSON.stringify(data),
-  }),
-  updateUser: (id: string, data: any) => apiFetch<any>(`/users/${id}`, {
-    method: 'PUT',
-    body: JSON.stringify(data),
-  }),
-  deleteUser: (id: string) => apiFetch<any>(`/users/${id}`, {
-    method: 'DELETE',
-  }),
+  getUsers: () => apiFetch<User[]>('/users'),
+  createUser: (data: Partial<User & { password: string }>) =>
+    apiFetch<User>('/users', { method: 'POST', body: JSON.stringify(data) }),
+  updateUser: (id: string, data: Partial<User & { password?: string }>) =>
+    apiFetch<User>(`/users/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteUser: (id: string) =>
+    apiFetch<User>(`/users/${id}`, { method: 'DELETE' }),
 
   // Grades
-  getGrades: () => apiFetch<any[]>('/grades'),
-  createGrade: (data: any) => apiFetch<any>('/grades', {
-    method: 'POST',
-    body: JSON.stringify(data),
-  }),
-  updateGrade: (id: string, data: any) => apiFetch<any>(`/grades/${id}`, {
-    method: 'PUT',
-    body: JSON.stringify(data),
-  }),
-  deleteGrade: (id: string) => apiFetch<any>(`/grades/${id}`, {
-    method: 'DELETE',
-  }),
+  getGrades: () => apiFetch<Grade[]>('/grades'),
+  createGrade: (data: Partial<Grade>) =>
+    apiFetch<Grade>('/grades', { method: 'POST', body: JSON.stringify(data) }),
+  updateGrade: (id: string, data: Partial<Grade>) =>
+    apiFetch<Grade>(`/grades/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteGrade: (id: string) =>
+    apiFetch<Grade>(`/grades/${id}`, { method: 'DELETE' }),
 
   // Subjects
-  getSubjects: () => apiFetch<any[]>('/subjects'),
-  createSubject: (data: any) => apiFetch<any>('/subjects', {
-    method: 'POST',
-    body: JSON.stringify(data),
-  }),
-  updateSubject: (id: string, data: any) => apiFetch<any>(`/subjects/${id}`, {
-    method: 'PUT',
-    body: JSON.stringify(data),
-  }),
-  deleteSubject: (id: string) => apiFetch<any>(`/subjects/${id}`, {
-    method: 'DELETE',
-  }),
+  getSubjects: () => apiFetch<Subject[]>('/subjects'),
+  createSubject: (data: Partial<Subject>) =>
+    apiFetch<Subject>('/subjects', { method: 'POST', body: JSON.stringify(data) }),
+  updateSubject: (id: string, data: Partial<Subject>) =>
+    apiFetch<Subject>(`/subjects/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteSubject: (id: string) =>
+    apiFetch<Subject>(`/subjects/${id}`, { method: 'DELETE' }),
 
   // Assignments
-  getAssignments: () => apiFetch<any[]>('/assignments'),
-  createAssignment: (data: any) => apiFetch<any>('/assignments', {
-    method: 'POST',
-    body: JSON.stringify(data),
-  }),
-  deleteAssignment: (id: string) => apiFetch<any>(`/assignments/${id}`, {
-    method: 'DELETE',
-  }),
+  getAssignments: () => apiFetch<Assignment[]>('/assignments'),
+  createAssignment: (data: Partial<Assignment>) =>
+    apiFetch<Assignment>('/assignments', { method: 'POST', body: JSON.stringify(data) }),
+  deleteAssignment: (id: string) =>
+    apiFetch<Assignment>(`/assignments/${id}`, { method: 'DELETE' }),
 
-  // Student Grades Mapping (which student is in which grade)
-  getStudentGrades: () => apiFetch<any[]>('/student_grades'),
-  createStudentGrade: (data: any) => apiFetch<any>('/student_grades', {
-    method: 'POST',
-    body: JSON.stringify(data),
-  }),
-  deleteStudentGrade: (id: string) => apiFetch<any>(`/student_grades/${id}`, {
-    method: 'DELETE',
-  }),
+  // Student Grades Mapping
+  getStudentGrades: () => apiFetch<StudentGrade[]>('/student_grades'),
+  createStudentGrade: (data: Partial<StudentGrade>) =>
+    apiFetch<StudentGrade>('/student_grades', { method: 'POST', body: JSON.stringify(data) }),
+  deleteStudentGrade: (id: string) =>
+    apiFetch<StudentGrade>(`/student_grades/${id}`, { method: 'DELETE' }),
 
   // Attendance
-  getAttendance: () => apiFetch<any[]>('/attendance'),
-  createAttendance: (data: any) => apiFetch<any>('/attendance', {
-    method: 'POST',
-    body: JSON.stringify(data),
-  }),
+  getAttendance: () => apiFetch<Attendance[]>('/attendance'),
+  createAttendance: (data: Partial<Attendance>) =>
+    apiFetch<Attendance>('/attendance', { method: 'POST', body: JSON.stringify(data) }),
 
   // Marks
-  getMarks: () => apiFetch<any[]>('/marks'),
-  createMark: (data: any) => apiFetch<any>('/marks', {
-    method: 'POST',
-    body: JSON.stringify(data),
-  }),
-  updateMark: (id: string, data: any) => apiFetch<any>(`/marks/${id}`, {
-    method: 'PUT',
-    body: JSON.stringify(data),
-  }),
+  getMarks: () => apiFetch<Mark[]>('/marks'),
+  createMark: (data: Partial<Mark>) =>
+    apiFetch<Mark>('/marks', { method: 'POST', body: JSON.stringify(data) }),
+  updateMark: (id: string, data: Partial<Mark>) =>
+    apiFetch<Mark>(`/marks/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
 
   // Citations
-  getCitations: () => apiFetch<any[]>('/citations'),
-  createCitation: (data: any) => apiFetch<any>('/citations', {
-    method: 'POST',
-    body: JSON.stringify(data),
-  }),
-  updateCitation: (id: string, data: any) => apiFetch<any>(`/citations/${id}`, {
-    method: 'PUT',
-    body: JSON.stringify(data),
-  }),
+  getCitations: () => apiFetch<Citation[]>('/citations'),
+  createCitation: (data: Partial<Citation>) =>
+    apiFetch<Citation>('/citations', { method: 'POST', body: JSON.stringify(data) }),
+  updateCitation: (id: string, data: Partial<Citation>) =>
+    apiFetch<Citation>(`/citations/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
 
   // Messages
-  getMessages: () => apiFetch<any[]>('/messages'),
-  createMessage: (data: any) => apiFetch<any>('/messages', {
-    method: 'POST',
-    body: JSON.stringify(data),
-  }),
-  updateMessage: (id: string, data: any) => apiFetch<any>(`/messages/${id}`, {
-    method: 'PATCH',
-    body: JSON.stringify(data),
-  }),
+  getMessages: () => apiFetch<Message[]>('/messages'),
+  createMessage: (data: Partial<Message>) =>
+    apiFetch<Message>('/messages', { method: 'POST', body: JSON.stringify(data) }),
+  updateMessage: (id: string, data: Partial<Message>) =>
+    apiFetch<Message>(`/messages/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
 
   // Evaluations
-  getEvaluations: () => apiFetch<any[]>('/evaluations'),
-  createEvaluation: (data: any) => apiFetch<any>('/evaluations', {
-    method: 'POST',
-    body: JSON.stringify(data),
-  }),
-  updateEvaluation: (id: string, data: any) => apiFetch<any>(`/evaluations/${id}`, {
-    method: 'PUT',
-    body: JSON.stringify(data),
-  }),
-  deleteEvaluation: (id: string) => apiFetch<any>(`/evaluations/${id}`, {
-    method: 'DELETE',
-  }),
+  getEvaluations: () => apiFetch<Evaluation[]>('/evaluations'),
+  createEvaluation: (data: Partial<Evaluation>) =>
+    apiFetch<Evaluation>('/evaluations', { method: 'POST', body: JSON.stringify(data) }),
+  updateEvaluation: (id: string, data: Partial<Evaluation>) =>
+    apiFetch<Evaluation>(`/evaluations/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteEvaluation: (id: string) =>
+    apiFetch<Evaluation>(`/evaluations/${id}`, { method: 'DELETE' }),
 };

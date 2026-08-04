@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { api } from '../services/api';
+import type { Message } from '../types';
 import { 
   ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, 
   CartesianGrid, Tooltip, Legend, ReferenceLine 
@@ -22,8 +23,8 @@ export const StudentDashboard: React.FC = () => {
   const [msgTeacherId, setMsgTeacherId] = useState('');
   const [msgSubject, setMsgSubject] = useState('');
   const [msgBody, setMsgBody] = useState('');
-  const [msgReplyTo, setMsgReplyTo] = useState<any>(null);
-  const [selectedMessage, setSelectedMessage] = useState<any>(null);
+  const [msgReplyTo, setMsgReplyTo] = useState<Message | null>(null);
+  const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
 
   useEffect(() => {
     if (navigateToTab === 'messages') {
@@ -58,22 +59,29 @@ export const StudentDashboard: React.FC = () => {
   // 3. Filter student's marks/grades
   const myMarks = marks.filter(m => m.estudiante_id === user?.id);
 
-  // 4. Group marks for Recharts (X axis: Subject Name, Y axis: Average Grade)
+  // 4. Group marks for Recharts (X axis: Subject Name, Y axis: weighted average grade)
   const getChartData = () => {
-    const dataMap: { [subjId: string]: { name: string; nota: number; count: number } } = {};
-    
+    const dataMap: { [subjId: string]: { name: string; weighted: number; weight: number; fallback: number; count: number } } = {};
+
     myMarks.forEach(m => {
       if (!dataMap[m.materia_id]) {
-        dataMap[m.materia_id] = { name: getSubjectName(m.materia_id), nota: 0, count: 0 };
+        dataMap[m.materia_id] = { name: getSubjectName(m.materia_id), weighted: 0, weight: 0, fallback: 0, count: 0 };
       }
-      dataMap[m.materia_id].nota += m.nota;
+      const pct = m.porcentaje || 0;
+      dataMap[m.materia_id].weighted += m.nota * pct;
+      dataMap[m.materia_id].weight += pct;
+      dataMap[m.materia_id].fallback += m.nota;
       dataMap[m.materia_id].count += 1;
     });
 
-    return Object.keys(dataMap).map(subjId => ({
-      name: dataMap[subjId].name,
-      'Nota Promedio': Number((dataMap[subjId].nota / dataMap[subjId].count).toFixed(2))
-    }));
+    return Object.keys(dataMap).map(subjId => {
+      const d = dataMap[subjId];
+      const avg = d.weight > 0 ? d.weighted / d.weight : (d.count ? d.fallback / d.count : 0);
+      return {
+        name: d.name,
+        'Nota Promedio': Number(avg.toFixed(2))
+      };
+    });
   };
 
   const chartData = getChartData();
@@ -106,7 +114,7 @@ export const StudentDashboard: React.FC = () => {
   };
 
   // Reply to a message
-  const handleReply = (msg: any) => {
+  const handleReply = (msg: Message) => {
     setMsgReplyTo(msg);
     setMsgTeacherId(msg.remitente_id === user?.id ? msg.destinatario_id : msg.remitente_id);
     setMsgSubject(msg.asunto.startsWith('Re: ') ? msg.asunto : `Re: ${msg.asunto}`);
@@ -145,7 +153,7 @@ export const StudentDashboard: React.FC = () => {
       setMsgReplyTo(null);
       await refreshData();
       alert('Mensaje enviado con éxito');
-    } catch (err) {
+    } catch {
       alert('Error al enviar mensaje');
     }
   };

@@ -16,7 +16,7 @@ const MainAppContent: React.FC = () => {
       <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center text-gray-900">
         <div className="flex flex-col items-center gap-3">
           <RefreshCw className="h-10 w-10 text-q10-500 animate-spin" />
-          <span className="text-sm font-medium text-gray-500">Cargando base de datos mock...</span>
+          <span className="text-sm font-medium text-gray-500">Cargando datos...</span>
         </div>
       </div>
     );
@@ -37,9 +37,9 @@ const MainAppContent: React.FC = () => {
           </p>
           <div className="text-xs text-gray-500 bg-gray-100 p-3 rounded-lg border border-gray-200 text-left font-mono">
             ¿Cómo solucionarlo?<br />
-            1. Abre una terminal en la carpeta 'api'.<br />
-            2. Ejecuta: 'npm install' si no lo has hecho.<br />
-            3. Ejecuta: 'npm run server' para activar json-server.<br />
+            1. Verifica que el backend esté corriendo.<br />
+            2. Local: ejecuta 'npm run dev' en la carpeta 'api' (con PostgreSQL activo).<br />
+            3. Producción: 'docker compose up -d' en la raíz del proyecto.<br />
             4. Recarga esta página.
           </div>
           <button

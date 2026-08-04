@@ -5,7 +5,8 @@ import { api } from '../services/api';
 import { 
   Plus, ToggleLeft, ToggleRight, ShieldAlert, CheckCircle2,
   Building2, Users, BookOpen, GraduationCap, Link2, UserPlus,
-  BookOpenCheck, LayoutDashboard
+  BookOpenCheck, Eye, EyeOff, X, Phone, Heart, Droplet, CreditCard,
+  AlertCircle, User as UserIcon, Key, Mail
 } from 'lucide-react';
 
 export const SuperAdminDashboard: React.FC = () => {
@@ -24,7 +25,7 @@ export const SuperAdminDashboard: React.FC = () => {
   // User CRUD states
   const [selectedInstId, setSelectedInstId] = useState('');
   const [userEmail, setUserEmail] = useState('');
-  const [userPass, setUserPass] = useState('password123');
+  const [userPass, setUserPass] = useState('');
   const [userRole, setUserRole] = useState<'admin' | 'teacher' | 'student'>('student');
   const [userNombre, setUserNombre] = useState('');
   const [userApellido, setUserApellido] = useState('');
@@ -35,6 +36,9 @@ export const SuperAdminDashboard: React.FC = () => {
   const [userTipoSangre, setUserTipoSangre] = useState('');
   const [userDiscapacidad, setUserDiscapacidad] = useState('');
   const [userContactoEmergencia, setUserContactoEmergencia] = useState({ nombre: '', telefono: '', relacion: '' });
+  const [showUserPass, setShowUserPass] = useState(false);
+  const [viewUser, setViewUser] = useState<User | null>(null);
+  const [userPasswords, setUserPasswords] = useState<Record<string, string>>({});
 
   // Grade/Subject states
   const [gradeName, setGradeName] = useState('');
@@ -73,9 +77,22 @@ export const SuperAdminDashboard: React.FC = () => {
     return u ? `${u.nombre} ${u.apellido}` : 'Desconocido';
   };
 
+  const getAge = (fechaNac?: string): number => {
+    if (!fechaNac) return 0;
+    const birth = new Date(fechaNac);
+    const today = new Date();
+    let age = today.getFullYear() - birth.getFullYear();
+    const m = today.getMonth() - birth.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+    return age;
+  };
+
+  const getInstName = (instId: string | null) => {
+    if (!instId) return 'Sin institución';
+    return institutions.find(i => i.id === instId)?.nombre || 'Desconocida';
+  };
+
   const instUsers = users.filter(u => u.institucion_id === selectedInstId);
-  const instStudents = instUsers.filter(u => u.rol === 'student');
-  const instTeachers = instUsers.filter(u => u.rol === 'teacher');
 
   const filteredAssignments = assignments.filter(a => a.institucion_id === assignInstId);
 
@@ -111,9 +128,9 @@ export const SuperAdminDashboard: React.FC = () => {
   // User CRUD
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!userEmail || !userNombre || !userApellido || !selectedInstId) return;
+    if (!userEmail || !userNombre || !userApellido || !selectedInstId || !userPass) return;
     try {
-      await api.createUser({
+      const created = await api.createUser({
         email: userEmail, password: userPass, rol: userRole,
         nombre: userNombre, apellido: userApellido,
         identificacion: userIdentificacion || undefined,
@@ -125,11 +142,12 @@ export const SuperAdminDashboard: React.FC = () => {
         contacto_emergencia: userContactoEmergencia.nombre ? userContactoEmergencia : undefined,
         institucion_id: selectedInstId, activo: true
       });
+      setUserPasswords(prev => ({ ...prev, [created.id]: userPass }));
       setUserEmail(''); setUserNombre(''); setUserApellido('');
       setUserGenero(''); setUserFechaNac(''); setUserIdentificacion('');
       setUserEps(''); setUserTipoSangre(''); setUserDiscapacidad('');
       setUserContactoEmergencia({ nombre: '', telefono: '', relacion: '' });
-      setUserPass('password123');
+      setUserPass('');
       showMsg('success', 'Usuario creado.');
       await refreshData();
     } catch { showMsg('error', 'Error al crear usuario.'); }
@@ -346,14 +364,16 @@ export const SuperAdminDashboard: React.FC = () => {
                 <div><label className="block text-xs text-gray-500 mb-1">Apellido</label><input type="text" required value={userApellido} onChange={e => setUserApellido(e.target.value)} className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none" /></div>
               </div>
               <div><label className="block text-xs text-gray-500 mb-1">Email</label><input type="email" required value={userEmail} onChange={e => setUserEmail(e.target.value)} placeholder="usuario@colegio.com" className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none" /></div>
-              <div><label className="block text-xs text-gray-500 mb-1">Contraseña</label><input type="password" required value={userPass} onChange={e => setUserPass(e.target.value)} className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none" /></div>
+              <div><label className="block text-xs text-gray-500 mb-1">Contraseña</label><div className="relative"><input type={showUserPass ? 'text' : 'password'} required value={userPass} onChange={e => setUserPass(e.target.value)} className="w-full px-3 py-2 pr-10 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none" /><button type="button" onClick={() => setShowUserPass(!showUserPass)} className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-gray-400 hover:text-gray-600">{showUserPass ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button></div></div>
               <div><label className="block text-xs text-gray-500 mb-1">Rol</label>
-                <select value={userRole} onChange={e => setUserRole(e.target.value as any)} className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none">
+                <select value={userRole} onChange={e => setUserRole(e.target.value as 'admin' | 'teacher' | 'student')} className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none">
                   <option value="student">Estudiante</option>
                   <option value="teacher">Profesor</option>
                   <option value="admin">Administrador</option>
                 </select>
               </div>
+              {userRole === 'student' && (
+              <>
               <div className="grid grid-cols-2 gap-3">
                 <div><label className="block text-xs text-gray-500 mb-1">Identificación</label>
                   <input type="text" value={userIdentificacion} onChange={e => setUserIdentificacion(e.target.value)} placeholder="CC/TI" className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none" />
@@ -407,6 +427,8 @@ export const SuperAdminDashboard: React.FC = () => {
                   </div>
                 </div>
               </div>
+              </>
+              )}
               <button type="submit" className="w-full py-2.5 bg-q10-600 hover:bg-q10-700 text-white font-semibold rounded-xl text-sm transition-colors">Registrar Usuario</button>
             </form>
           </div>
@@ -442,7 +464,12 @@ export const SuperAdminDashboard: React.FC = () => {
                           <span className={`px-2 py-0.5 rounded-full text-[10px] ${u.activo ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-400'}`}>{u.activo ? 'Activo' : 'Desactivado'}</span>
                         </td>
                         <td className="py-3 text-right">
-                          <button onClick={() => toggleUserActive(u)} className={`px-2 py-1 rounded text-xs border ${u.activo ? 'bg-red-50 hover:bg-red-50 text-red-400 border-red-100' : 'bg-emerald-50 hover:bg-emerald-950/40 text-emerald-600 border-emerald-100'}`}>{u.activo ? 'Desactivar' : 'Activar'}</button>
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button onClick={() => setViewUser(u)} className="p-1.5 rounded-lg text-gray-400 hover:text-q10-600 hover:bg-q10-50 transition-colors" title="Ver información">
+                              <Eye className="h-4 w-4" />
+                            </button>
+                            <button onClick={() => toggleUserActive(u)} className={`px-2 py-1 rounded text-xs border ${u.activo ? 'bg-red-50 hover:bg-red-50 text-red-400 border-red-100' : 'bg-emerald-50 hover:bg-emerald-950/40 text-emerald-600 border-emerald-100'}`}>{u.activo ? 'Desactivar' : 'Activar'}</button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -607,6 +634,87 @@ export const SuperAdminDashboard: React.FC = () => {
                   <span className="px-2 py-0.5 rounded bg-q10-50 text-q10-600 font-medium">{getGradeLabel(sg.grado_id)}</span>
                 </div>
               )) : <p className="text-sm text-gray-500 py-4 text-center">Selecciona una institución.</p>}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* User detail modal */}
+      {viewUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => setViewUser(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="bg-gradient-to-r from-q10-500 to-indigo-600 rounded-t-2xl p-6 text-white">
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="h-14 w-14 bg-white/20 rounded-full flex items-center justify-center text-white font-bold text-xl">
+                    {viewUser.nombre?.[0]}{viewUser.apellido?.[0]}
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold">{viewUser.nombre} {viewUser.apellido}</h3>
+                    <p className="text-white/80 text-sm">{viewUser.email}</p>
+                    <span className={`inline-block mt-1 px-2 py-0.5 rounded text-[10px] uppercase font-bold ${viewUser.rol === 'admin' ? 'bg-amber-400/30 text-amber-100' : viewUser.rol === 'teacher' ? 'bg-emerald-400/30 text-emerald-100' : viewUser.rol === 'super_admin' ? 'bg-purple-400/30 text-purple-100' : 'bg-blue-400/30 text-blue-100'}`}>{viewUser.rol}</span>
+                  </div>
+                </div>
+                <button onClick={() => setViewUser(null)} className="p-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors">
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-5 pt-4 border-t border-white/20">
+                <div className="flex items-center gap-2">
+                  <CreditCard className="h-4 w-4 text-white/70" />
+                  <div><div className="text-[10px] text-white/70">Identificación</div><div className="text-sm font-semibold">{viewUser.identificacion || 'N/R'}</div></div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <UserIcon className="h-4 w-4 text-white/70" />
+                  <div><div className="text-[10px] text-white/70">Edad / Género</div><div className="text-sm font-semibold">{viewUser.fecha_nacimiento ? `${getAge(viewUser.fecha_nacimiento)} años` : 'N/R'} · {viewUser.genero || 'N/E'}</div></div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${viewUser.activo ? 'bg-emerald-400/30 text-emerald-100' : 'bg-red-400/30 text-red-100'}`}>{viewUser.activo ? 'Activo' : 'Inactivo'}</span>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4 mt-3 pt-3 border-t border-white/20">
+                <div className="flex items-center gap-2">
+                  <Mail className="h-4 w-4 text-white/70" />
+                  <div><div className="text-[10px] text-white/70">Credenciales de Acceso</div><div className="text-sm font-semibold">{viewUser.email}</div></div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Key className="h-4 w-4 text-white/70" />
+                  <div><div className="text-[10px] text-white/70">Contraseña</div><div className="text-sm font-semibold">{userPasswords[viewUser.id] || 'No disponible'}</div></div>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-3 pt-3 border-t border-white/20">
+                <div className="flex items-center gap-2">
+                  <Heart className="h-4 w-4 text-white/70" />
+                  <div><div className="text-[10px] text-white/70">EPS</div><div className="text-sm font-semibold">{viewUser.eps || 'N/R'}</div></div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Droplet className="h-4 w-4 text-white/70" />
+                  <div><div className="text-[10px] text-white/70">Tipo Sangre</div><div className="text-sm font-semibold">{viewUser.tipo_sangre || 'N/R'}</div></div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Building2 className="h-4 w-4 text-white/70" />
+                  <div><div className="text-[10px] text-white/70">Institución</div><div className="text-sm font-semibold">{getInstName(viewUser.institucion_id)}</div></div>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4 mt-3 pt-3 border-t border-white/20">
+                <div className="flex items-center gap-2">
+                  <Phone className="h-4 w-4 text-white/70" />
+                  <div><div className="text-[10px] text-white/70">Contacto Emergencia</div><div className="text-sm font-semibold">
+                    {viewUser.contacto_emergencia && viewUser.contacto_emergencia.nombre
+                      ? `${viewUser.contacto_emergencia.nombre} (${viewUser.contacto_emergencia.relacion || 'N/R'}) - ${viewUser.contacto_emergencia.telefono || 'N/R'}`
+                      : 'N/R'}
+                  </div></div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4 text-white/70" />
+                  <div><div className="text-[10px] text-white/70">Discapacidad</div><div className="text-sm font-semibold">{viewUser.discapacidad || 'Ninguna'}</div></div>
+                </div>
+              </div>
+            </div>
+            <div className="p-6 flex justify-end">
+              <button onClick={() => setViewUser(null)} className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl text-sm transition-colors">
+                Cerrar
+              </button>
             </div>
           </div>
         </div>
