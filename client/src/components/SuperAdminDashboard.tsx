@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import type { Institution, User } from '../context/AppContext';
+import type { Institution, User, Role } from '../context/AppContext';
 import { api } from '../services/api';
 import { 
   Plus, ToggleLeft, ToggleRight, ShieldAlert, CheckCircle2,
   Building2, Users, BookOpen, GraduationCap, Link2, UserPlus,
   BookOpenCheck, Eye, EyeOff, X, Phone, Heart, Droplet, CreditCard,
-  AlertCircle, User as UserIcon, Key, Mail
+  AlertCircle, User as UserIcon, Key, Mail, Edit3, Trash2
 } from 'lucide-react';
 
 export const SuperAdminDashboard: React.FC = () => {
@@ -39,6 +39,10 @@ export const SuperAdminDashboard: React.FC = () => {
   const [showUserPass, setShowUserPass] = useState(false);
   const [viewUser, setViewUser] = useState<User | null>(null);
   const [userPasswords, setUserPasswords] = useState<Record<string, string>>({});
+
+  const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [editForm, setEditForm] = useState<Partial<User & { password: string }>>({});
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<User | null>(null);
 
   // Grade/Subject states
   const [gradeName, setGradeName] = useState('');
@@ -158,6 +162,68 @@ export const SuperAdminDashboard: React.FC = () => {
       await api.updateUser(targetUser.id, { ...targetUser, activo: !targetUser.activo });
       await refreshData();
     } catch { showMsg('error', 'Error al cambiar estado.'); }
+  };
+
+  const openEditUser = (u: User) => {
+    setEditingUser(u);
+    setEditForm({
+      nombre: u.nombre,
+      apellido: u.apellido,
+      email: u.email,
+      rol: u.rol,
+      password: '',
+      identificacion: u.identificacion || '',
+      genero: u.genero || '',
+      fecha_nacimiento: u.fecha_nacimiento || '',
+      eps: u.eps || '',
+      tipo_sangre: u.tipo_sangre || '',
+      discapacidad: u.discapacidad || '',
+      contacto_emergencia: u.contacto_emergencia,
+    });
+  };
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingUser || !editForm.nombre || !editForm.apellido || !editForm.email) return;
+    try {
+      const data: Partial<User & { password: string }> = {
+        nombre: editForm.nombre,
+        apellido: editForm.apellido,
+        email: editForm.email,
+        rol: editForm.rol as Role,
+      };
+      if (editForm.password) data.password = editForm.password;
+      if (editingUser.rol === 'student' || editForm.rol === 'student') {
+        data.identificacion = editForm.identificacion || undefined;
+        data.genero = editForm.genero || undefined;
+        data.fecha_nacimiento = editForm.fecha_nacimiento || undefined;
+        data.eps = editForm.eps || undefined;
+        data.tipo_sangre = editForm.tipo_sangre || undefined;
+        data.discapacidad = editForm.discapacidad || undefined;
+        if (editForm.contacto_emergencia && editForm.contacto_emergencia.nombre) {
+          data.contacto_emergencia = editForm.contacto_emergencia;
+        }
+      }
+      await api.updateUser(editingUser.id, data);
+      if (editForm.password) {
+        const pwd = editForm.password as string;
+        setUserPasswords(prev => ({ ...prev, [editingUser.id]: pwd }));
+      }
+      setEditingUser(null);
+      showMsg('success', 'Usuario actualizado.');
+      await refreshData();
+    } catch { showMsg('error', 'Error al actualizar usuario.'); }
+  };
+
+  const handleDeleteUser = async () => {
+    if (!showDeleteConfirm) return;
+    try {
+      await api.deleteUser(showDeleteConfirm.id);
+      setUserPasswords(prev => Object.fromEntries(Object.entries(prev).filter(([k]) => k !== showDeleteConfirm.id)));
+      setShowDeleteConfirm(null);
+      showMsg('success', 'Usuario eliminado.');
+      await refreshData();
+    } catch { showMsg('error', 'Error al eliminar usuario.'); }
   };
 
   // Grade/Subject handlers
@@ -432,6 +498,93 @@ export const SuperAdminDashboard: React.FC = () => {
               <button type="submit" className="w-full py-2.5 bg-q10-600 hover:bg-q10-700 text-white font-semibold rounded-xl text-sm transition-colors">Registrar Usuario</button>
             </form>
           </div>
+
+      {/* Edit user modal */}
+      {editingUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => setEditingUser(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="bg-gradient-to-r from-amber-500 to-orange-600 rounded-t-2xl p-6 text-white">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-bold">Editar Usuario</h3>
+                <button onClick={() => setEditingUser(null)} className="p-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/10">
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+            <form onSubmit={handleSaveEdit} className="p-6 space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div><label className="block text-xs font-medium text-gray-600 mb-1">Nombre</label><input type="text" required value={editForm.nombre || ''} onChange={e => setEditForm(p => ({ ...p, nombre: e.target.value }))} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/50" /></div>
+                <div><label className="block text-xs font-medium text-gray-600 mb-1">Apellido</label><input type="text" required value={editForm.apellido || ''} onChange={e => setEditForm(p => ({ ...p, apellido: e.target.value }))} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/50" /></div>
+              </div>
+              <div><label className="block text-xs font-medium text-gray-600 mb-1">Email</label><input type="email" required value={editForm.email || ''} onChange={e => setEditForm(p => ({ ...p, email: e.target.value }))} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/50" /></div>
+              <div><label className="block text-xs font-medium text-gray-600 mb-1">Nueva Contraseña (dejar vacío para no cambiar)</label><input type="password" value={editForm.password || ''} onChange={e => setEditForm(p => ({ ...p, password: e.target.value }))} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/50" /></div>
+              <div><label className="block text-xs font-medium text-gray-600 mb-1">Rol</label>
+                <select value={editForm.rol || 'student'} onChange={e => setEditForm(p => ({ ...p, rol: e.target.value as Role }))} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/50">
+                  <option value="student">Estudiante</option>
+                  <option value="teacher">Profesor</option>
+                  <option value="admin">Administrador</option>
+                </select>
+              </div>
+              {(editingUser.rol === 'student' || editForm.rol === 'student') && (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  <div><label className="block text-xs font-medium text-gray-600 mb-1">Identificación</label><input type="text" value={editForm.identificacion || ''} onChange={e => setEditForm(p => ({ ...p, identificacion: e.target.value }))} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none" /></div>
+                  <div><label className="block text-xs font-medium text-gray-600 mb-1">Género</label>
+                    <select value={editForm.genero || ''} onChange={e => setEditForm(p => ({ ...p, genero: e.target.value }))} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none">
+                      <option value="">--</option>
+                      <option value="masculino">Masculino</option>
+                      <option value="femenino">Femenino</option>
+                      <option value="otro">Otro</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div><label className="block text-xs font-medium text-gray-600 mb-1">Fecha Nac.</label><input type="date" value={editForm.fecha_nacimiento || ''} onChange={e => setEditForm(p => ({ ...p, fecha_nacimiento: e.target.value }))} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none" /></div>
+                  <div><label className="block text-xs font-medium text-gray-600 mb-1">EPS</label><input type="text" value={editForm.eps || ''} onChange={e => setEditForm(p => ({ ...p, eps: e.target.value }))} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none" /></div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div><label className="block text-xs font-medium text-gray-600 mb-1">Tipo Sangre</label>
+                    <select value={editForm.tipo_sangre || ''} onChange={e => setEditForm(p => ({ ...p, tipo_sangre: e.target.value }))} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none">
+                      <option value="">--</option>
+                      <option value="A+">A+</option><option value="A-">A-</option><option value="B+">B+</option><option value="B-">B-</option>
+                      <option value="AB+">AB+</option><option value="AB-">AB-</option><option value="O+">O+</option><option value="O-">O-</option>
+                    </select>
+                  </div>
+                  <div><label className="block text-xs font-medium text-gray-600 mb-1">Discapacidad</label><input type="text" value={editForm.discapacidad || ''} onChange={e => setEditForm(p => ({ ...p, discapacidad: e.target.value }))} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none" /></div>
+                </div>
+              </>
+              )}
+              <div className="flex gap-3 pt-2">
+                <button type="button" onClick={() => setEditingUser(null)} className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-xl text-sm transition-colors">Cancelar</button>
+                <button type="submit" className="flex-1 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-xl text-sm transition-colors">Guardar Cambios</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete confirmation modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => setShowDeleteConfirm(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full" onClick={e => e.stopPropagation()}>
+            <div className="p-6 text-center">
+              <div className="mx-auto w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-4">
+                <Trash2 className="h-6 w-6 text-red-500" />
+              </div>
+              <h3 className="text-lg font-bold text-gray-900 mb-2">Eliminar Usuario</h3>
+              <p className="text-sm text-gray-500">
+                ¿Estás seguro de eliminar a <strong>{showDeleteConfirm.nombre} {showDeleteConfirm.apellido}</strong>?
+              </p>
+              <p className="text-xs text-red-500 mt-2">Esta acción no se puede deshacer.</p>
+            </div>
+            <div className="px-6 pb-6 flex gap-3">
+              <button onClick={() => setShowDeleteConfirm(null)} className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-xl text-sm transition-colors">Cancelar</button>
+              <button onClick={handleDeleteUser} className="flex-1 py-2.5 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-xl text-sm transition-colors">Eliminar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
           <div className="bg-white shadow-sm border border-gray-200 p-6 rounded-2xl lg:col-span-2">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-bold text-gray-900">Usuarios por Institución</h3>
@@ -467,6 +620,12 @@ export const SuperAdminDashboard: React.FC = () => {
                           <div className="flex items-center justify-end gap-1.5">
                             <button onClick={() => setViewUser(u)} className="p-1.5 rounded-lg text-gray-400 hover:text-q10-600 hover:bg-q10-50 transition-colors" title="Ver información">
                               <Eye className="h-4 w-4" />
+                            </button>
+                            <button onClick={() => openEditUser(u)} className="p-1.5 rounded-lg text-gray-400 hover:text-amber-600 hover:bg-amber-50 transition-colors" title="Editar usuario">
+                              <Edit3 className="h-4 w-4" />
+                            </button>
+                            <button onClick={() => setShowDeleteConfirm(u)} className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors" title="Eliminar usuario">
+                              <Trash2 className="h-4 w-4" />
                             </button>
                             <button onClick={() => toggleUserActive(u)} className={`px-2 py-1 rounded text-xs border ${u.activo ? 'bg-red-50 hover:bg-red-50 text-red-400 border-red-100' : 'bg-emerald-50 hover:bg-emerald-950/40 text-emerald-600 border-emerald-100'}`}>{u.activo ? 'Desactivar' : 'Activar'}</button>
                           </div>
