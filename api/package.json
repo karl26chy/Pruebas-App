@@ -2,14 +2,15 @@
   "name": "platform-api",
   "version": "2.0.0",
   "description": "API Express + PostgreSQL para la plataforma educativa",
-  "main": "src/index.js",
-  "type": "commonjs",
+  "main": "src/server.js",
+  "type": "module",
   "scripts": {
-    "start": "node src/index.js",
-    "dev": "node --watch src/index.js",
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
     "setup": "node scripts/setup.js",
     "seed": "node scripts/setup.js",
-    "smoke": "node scripts/smoke.js"
+    "smoke": "node scripts/smoke.js",
+    "test": "node tests/run.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.2",

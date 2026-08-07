@@ -1,10 +1,13 @@
-const fs = require('fs');
-const path = require('path');
-const bcrypt = require('bcryptjs');
-const pool = require('../src/db');
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import bcrypt from 'bcryptjs';
+import pool from '../src/db/pool.js';
 
-const SCHEMA = fs.readFileSync(path.join(__dirname, '..', 'schema.sql'), 'utf8');
-const SEED_FILE = path.join(__dirname, '..', 'db.json');
+const here = path.dirname(fileURLToPath(import.meta.url));
+
+const SCHEMA = fs.readFileSync(path.join(here, '..', 'schema.sql'), 'utf8');
+const SEED_FILE = path.join(here, '..', 'db.json');
 
 const COLLECTION_TABLES = [
   'institutions',

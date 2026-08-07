@@ -14,4 +14,4 @@ ENV NODE_ENV=production
 
 EXPOSE 5000
 
-CMD ["sh", "-c", "node scripts/setup.js && node src/index.js"]
+CMD ["sh", "-c", "node scripts/setup.js && node src/server.js"]

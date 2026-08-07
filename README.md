@@ -4,14 +4,33 @@ Sistema integral de gestión académica para colegios y universidades, con sopor
 
 ## Arquitectura
 
+Arquitectura por capas: cada capa solo conoce a la de abajo.
+Detalle completo y reglas en [ARQUITECTURA.md](ARQUITECTURA.md).
+
 ```
 /
-├── api/                      # API (Express + PostgreSQL + JWT)
-│   ├── src/                  # Rutas, auth, middleware
+├── api/                      # API (Express + PostgreSQL + JWT, ESM)
+│   ├── src/
+│   │   ├── server.js         # arranque
+│   │   ├── app.js            # ensamblado de Express
+│   │   ├── routes/           # verbo + ruta → controlador
+│   │   ├── controllers/      # HTTP ↔ dominio
+│   │   ├── services/         # casos de uso
+│   │   ├── repositories/     # todo el SQL
+│   │   ├── policies/         # aislamiento multi-institución + RBAC
+│   │   ├── validators/       # validación por recurso
+│   │   ├── middleware/       # auth, rate limit, errores
+│   │   ├── config/ · db/ · shared/
+│   ├── tests/                # suite que congela el comportamiento del API
 │   ├── schema.sql            # Esquema de tablas
 │   ├── scripts/setup.js      # Crea esquema y siembra datos iniciales (db.json)
 │   └── db.json               # Datos iniciales de seed
 ├── client/                   # Frontend (React + Vite + TypeScript + Tailwind)
+│   └── src/
+│       ├── lib/              # cálculos puros (promedios, asistencia, edades)
+│       ├── services/         # http · api/ · export/
+│       ├── context/ · hooks/ # estado global y ciclo de vida
+│       └── components/       # ui/ · charts/ · messaging/ · dashboards/<rol>/
 └── docker-compose.yml        # Despliegue: PostgreSQL + API + Nginx
 ```
 
@@ -62,6 +81,25 @@ npm run dev               # http://localhost:5000
 cd client
 npm install
 npm run dev               # http://localhost:5173 (proxya /api → localhost:5000)
+```
+
+## Pruebas
+
+```bash
+cd api
+npm test                  # suite completa del API (110 verificaciones)
+```
+
+El runner arranca su propia instancia de la API, crea dos instituciones de
+prueba aisladas y limpia todo al terminar. Apunta a la base indicada en
+`TEST_DATABASE_URL` (por defecto `postgres://platform:platform@localhost:55432/platform`).
+
+Una base de pruebas desechable:
+
+```bash
+docker run -d --name pruebas-app-testdb \
+  -e POSTGRES_USER=platform -e POSTGRES_PASSWORD=platform -e POSTGRES_DB=platform \
+  -p 55432:5432 postgres:16-alpine
 ```
 
 ## Despliegue a Producción
@@ -153,5 +191,6 @@ docker compose exec db pg_dump -U platform platform > backup_$(date +%F).sql
 - [x] FASE 4: Profesor
 - [x] FASE 5: Estudiante
 - [x] FASE 6: Exportación PDF/Excel
-- [ ] FASE 7: Pruebas automatizadas
+- [x] FASE 7: Pruebas automatizadas del API (`api/tests`)
+- [ ] FASE 7b: Pruebas del frontend
 - [ ] FASE 8: Despliegue producción (SSL + dominio)

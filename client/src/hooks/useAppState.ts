@@ -1,0 +1,90 @@
+import { useCallback, useEffect, useState } from 'react';
+import { useSubdomain } from './useSubdomain';
+import { usePlatformData, describirFallo } from './usePlatformData';
+import { useAuthSession } from './useAuthSession';
+import type { AppContextValue } from '../context/app-context';
+
+/**
+ * Compone el estado global de la aplicación a partir de sus tres piezas:
+ * subdominio activo, datos de la plataforma y sesión del usuario.
+ */
+export function useAppState(): AppContextValue {
+  const { activeSubdomain, setSimulatedSubdomain, restoreSavedSubdomain } = useSubdomain();
+  const {
+    collections,
+    loading,
+    dataError,
+    setLoading,
+    setDataError,
+    resetSessionCollections,
+    fetchInstitutions,
+    fetchSessionCollections,
+    loadEverything,
+  } = usePlatformData();
+
+  const clearDataError = useCallback(() => setDataError(null), [setDataError]);
+
+  const { user, authError, login, logout, restoreUser } = useAuthSession({
+    institutions: collections.institutions,
+    activeSubdomain,
+    setSimulatedSubdomain,
+    loadEverything,
+    resetSessionCollections,
+    clearDataError,
+  });
+
+  const [navigateToTab, setNavigateToTab] = useState<string | null>(null);
+
+  // Arranque: subdominio guardado, sesión previa y datos iniciales.
+  useEffect(() => {
+    const restoreSession = async () => {
+      try {
+        setLoading(true);
+        setDataError(null);
+
+        restoreSavedSubdomain();
+
+        const hasSession = await restoreUser();
+
+        await fetchInstitutions();
+
+        if (hasSession) {
+          await fetchSessionCollections();
+        }
+      } catch (err: unknown) {
+        console.error('Failed to load data from API:', err);
+        setDataError(describirFallo(err));
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    restoreSession();
+  }, [
+    restoreSavedSubdomain,
+    restoreUser,
+    fetchInstitutions,
+    fetchSessionCollections,
+    setLoading,
+    setDataError,
+  ]);
+
+  const currentInstitution =
+    collections.institutions.find(inst => inst.subdominio === activeSubdomain) || null;
+
+  return {
+    user,
+    loading,
+    authError,
+    dataError,
+    ...collections,
+    activeSubdomain,
+    setSimulatedSubdomain,
+    login,
+    logout,
+    refreshData: loadEverything,
+    currentInstitution,
+    navigateToTab,
+    setNavigateToTab,
+  };
+}
