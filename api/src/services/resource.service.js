@@ -47,6 +47,14 @@ export async function create(resource, body, user) {
   await validateRow(resource, data, null);
   await hashSecrets(resource, data);
   ensureYear(resource, data);
+
+  if (resource === 'academic_periods') {
+    // Crear un periodo nunca abre silenciosamente el periodo actual: si no se
+    // indica, nace cerrado. Abrir es una acción explícita y transaccional.
+    if (data.activo === undefined) data.activo = false;
+    if (data.activo === true) return repo.insertOpenPeriod(data);
+  }
+
   return repo.insert(resource, data);
 }
 
@@ -59,6 +67,13 @@ export async function replace(resource, id, body, user) {
   await validateRow(resource, data, existing);
   await hashSecrets(resource, data);
   ensureYear(resource, data);
+
+  if (resource === 'academic_periods' && data.activo === true) {
+    // Abrir un periodo cierra los demás de la institución, transaccionalmente.
+    const row = await repo.setPeriodOpen(id, existing.institucion_id);
+    if (!row) throw notFound();
+    return row;
+  }
 
   const row = await repo.update(resource, id, data);
   if (!row) throw notFound();
@@ -154,6 +169,37 @@ export async function destroy(resource, id, user) {
     const detalle = detalleConteos(deps, SUBJECT_DEP_LABELS);
     if (detalle) {
       throw new HttpError(409, `No se puede eliminar esta materia porque tiene datos asociados: ${detalle}.`);
+    }
+  }
+
+  if (resource === 'academic_periods') {
+    const deps = await repo.countPeriodDependencies(id);
+    const partes = [];
+    if (deps.evaluaciones > 0) partes.push(`${deps.evaluaciones} evaluaciones`);
+    if (deps.notas > 0) partes.push(`${deps.notas} notas`);
+    if (partes.length > 0) {
+      throw new HttpError(409, `No se puede eliminar este periodo porque tiene datos asociados: ${partes.join(', ')}.`);
+    }
+  }
+
+  if (resource === 'evaluations') {
+    if (existing.periodo_id) {
+      const periodo = await repo.periodById(existing.periodo_id);
+      if (periodo && periodo.activo === false) {
+        throw new HttpError(409, 'El periodo está cerrado; no se puede eliminar la evaluación.');
+      }
+    }
+  }
+
+  if (resource === 'marks') {
+    if (existing.evaluacion_id) {
+      const evaluacion = await repo.evaluationById(existing.evaluacion_id);
+      if (evaluacion && evaluacion.periodo_id) {
+        const periodo = await repo.periodById(evaluacion.periodo_id);
+        if (periodo && periodo.activo === false) {
+          throw new HttpError(409, 'El periodo está cerrado; no se puede eliminar la nota.');
+        }
+      }
     }
   }
 

@@ -1,15 +1,17 @@
 import React, { useState } from 'react';
-import { Eye, LayoutDashboard } from 'lucide-react';
+import { CalendarDays, Eye, LayoutDashboard } from 'lucide-react';
 import { Tabs, type TabItem } from '../../ui';
 import { useAdminDashboard } from './useAdminDashboard';
 import { OverviewTab } from './OverviewTab';
 import { StudentsTab } from './StudentsTab';
+import { PeriodsTab } from './PeriodsTab';
 
-type AdminTab = 'overview' | 'students';
+type AdminTab = 'overview' | 'students' | 'periods';
 
 const TABS: TabItem<AdminTab>[] = [
   { id: 'overview', label: 'Resumen', icon: <LayoutDashboard className="h-4 w-4" /> },
   { id: 'students', label: 'Estudiantes', icon: <Eye className="h-4 w-4" /> },
+  { id: 'periods', label: 'Periodos Académicos', icon: <CalendarDays className="h-4 w-4" /> },
 ];
 
 export const AdminDashboard: React.FC = () => {
@@ -62,6 +64,8 @@ export const AdminDashboard: React.FC = () => {
           buildBoletinData={buildBoletinData}
         />
       )}
+
+      {activeTab === 'periods' && <PeriodsTab />}
     </div>
   );
 };

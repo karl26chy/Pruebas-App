@@ -64,7 +64,7 @@ export default async function validationSuite(world) {
     const evalB = (await post('/evaluations', {
       institucion_id: world.inst.B.id, materia_id: world.subjects.X.id,
       grado_id: world.grades.B.id, nombre: `EvalB ${world.id}`,
-      fecha_evaluacion: '2026-04-01', porcentaje: 20, periodo: 'Periodo 1',
+      fecha_evaluacion: '2026-04-01', porcentaje: 20, periodo: 'Periodo 1', anio: '2026',
       creado_por: world.users.adminB.id,
     }, world.tokens.super)).data;
     track(world, 'evaluations', evalB.id);

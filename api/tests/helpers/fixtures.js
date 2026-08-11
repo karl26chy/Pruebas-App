@@ -102,6 +102,27 @@ export async function buildWorld() {
     grado_id: gradeA.id,
   }, su);
 
+  // Periodo académico abierto por institución: el "actual" de cada una.
+  const periodA = await create('academic_periods', {
+    institucion_id: instA.id,
+    nombre: 'Periodo 1',
+    numero: 1,
+    anio: 2026,
+    fecha_inicio: '2026-01-15',
+    fecha_fin: '2026-03-15',
+    activo: true,
+  }, su);
+
+  const periodB = await create('academic_periods', {
+    institucion_id: instB.id,
+    nombre: 'Periodo 1',
+    numero: 1,
+    anio: 2026,
+    fecha_inicio: '2026-01-15',
+    fecha_fin: '2026-03-15',
+    activo: true,
+  }, su);
+
   const evalA = await create('evaluations', {
     institucion_id: instA.id,
     materia_id: subjectX.id,
@@ -110,6 +131,8 @@ export async function buildWorld() {
     fecha_evaluacion: '2026-03-01',
     porcentaje: 30,
     periodo: 'Periodo 1',
+    anio: '2026',
+    periodo_id: periodA.id,
     creado_por: teacherA.id,
   }, su);
 
@@ -121,6 +144,8 @@ export async function buildWorld() {
     fecha_evaluacion: '2026-04-01',
     porcentaje: 30,
     periodo: 'Periodo 1',
+    anio: '2026',
+    periodo_id: periodA.id,
     creado_por: teacherA.id,
   }, su);
 
@@ -147,6 +172,7 @@ export async function buildWorld() {
     subjects: { X: subjectX, Y: subjectY },
     assignments: { A: assignA },
     enrollments: { A: enrollA },
+    periods: { A: periodA, B: periodB },
     evaluations: { A: evalA, A2: evalA2 },
     created: [],
   };
@@ -169,6 +195,9 @@ export async function destroyWorld(world) {
   // Tablas sin claves foráneas: hay que limpiarlas explícitamente.
   for (const ev of [world.evaluations.A, world.evaluations.A2]) {
     await del(`/evaluations/${ev.id}`, su).catch(() => {});
+  }
+  for (const p of [world.periods.A, world.periods.B]) {
+    await del(`/academic_periods/${p.id}`, su).catch(() => {});
   }
   await del(`/student_grades/${world.enrollments.A.id}`, su).catch(() => {});
   await del(`/assignments/${world.assignments.A.id}`, su).catch(() => {});

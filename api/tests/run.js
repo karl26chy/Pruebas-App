@@ -13,6 +13,7 @@ import rbacWriteSuite from './suites/rbac-write.js';
 import validationSuite from './suites/validation.js';
 import crudSuite from './suites/crud.js';
 import errorsSuite from './suites/errors.js';
+import periodsSuite from './suites/periods.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const apiRoot = path.resolve(here, '..');
@@ -107,6 +108,7 @@ async function main() {
     await validationSuite(world);
     await crudSuite(world);
     await errorsSuite(world);
+    await periodsSuite(world);
 
     exitCode = report();
   } catch (err) {

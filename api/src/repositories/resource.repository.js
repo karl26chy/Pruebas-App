@@ -156,6 +156,17 @@ export async function countSubjectDependencies(subjectId) {
   return rows[0];
 }
 
+/** Evaluaciones y notas asociadas a un periodo académico (borrados seguros). */
+export async function countPeriodDependencies(periodId) {
+  const { rows } = await pool.query(
+    `SELECT
+       (SELECT COUNT(*) FROM evaluations WHERE "periodo_id" = $1)::int AS evaluaciones,
+       (SELECT COUNT(*) FROM marks WHERE "periodo_id" = $1)::int AS notas`,
+    [periodId]
+  );
+  return rows[0];
+}
+
 // --- Matrículas: consultas para validar duplicados --------------------------
 
 /** Matrícula existente de un estudiante, si la tiene. */
@@ -243,6 +254,78 @@ export async function periodsOfInstitution(institucionId) {
     [institucionId]
   );
   return rows;
+}
+
+/** Periodos abiertos (activo) de una institución. */
+export async function openPeriodsOfInstitution(institucionId) {
+  const { rows } = await pool.query(
+    `SELECT * FROM academic_periods WHERE "institucion_id" = $1 AND activo ORDER BY "anio" ASC, "numero" ASC`,
+    [institucionId]
+  );
+  return rows;
+}
+
+/**
+ * Abre un periodo y cierra los demás de la misma institución, de forma
+ * transaccional. Devuelve null si el periodo no existe o no pertenece a la
+ * institución indicada.
+ */
+export async function setPeriodOpen(periodId, institucionId) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { rows } = await client.query(
+      `UPDATE academic_periods SET activo = true WHERE id = $1 AND "institucion_id" = $2 RETURNING *`,
+      [periodId, institucionId]
+    );
+    if (rows.length === 0) {
+      await client.query('ROLLBACK');
+      return null;
+    }
+    await client.query(
+      `UPDATE academic_periods SET activo = false WHERE "institucion_id" = $1 AND id <> $2`,
+      [institucionId, periodId]
+    );
+    await client.query('COMMIT');
+    return sanitizeRow('academic_periods', rows[0]);
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Inserta un periodo abierto y cierra los demás de la misma institución en la
+ * misma transacción, para que nunca queden dos abiertos aunque falle a medias.
+ */
+export async function insertOpenPeriod(data) {
+  if (!data.id) data.id = generateId();
+
+  const cols = Object.keys(data);
+  const values = Object.values(data);
+  const placeholders = values.map((_, i) => '$' + (i + 1)).join(', ');
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { rows } = await client.query(
+      `INSERT INTO academic_periods (${cols.map(quote).join(', ')}) VALUES (${placeholders}) RETURNING *`,
+      values
+    );
+    await client.query(
+      `UPDATE academic_periods SET activo = false WHERE "institucion_id" = $1 AND id <> $2`,
+      [data.institucion_id, rows[0].id]
+    );
+    await client.query('COMMIT');
+    return sanitizeRow('academic_periods', rows[0]);
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
 /** Dependencias de una institución: solo las que apuntan a su institucion_id o

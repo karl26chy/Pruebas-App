@@ -53,6 +53,10 @@ export async function validateMark(data, existingRow) {
       if (periodo.activo === false) {
         throw new HttpError(409, 'El periodo está cerrado; no se pueden registrar o modificar notas.');
       }
+    } else {
+      // Evaluación heredada sin vínculo a un periodo: no pertenece a un
+      // periodo abierto, así que no se puede calificar.
+      throw new HttpError(409, 'La evaluación no está asociada a un periodo abierto; no se pueden registrar o modificar notas.');
     }
   }
 }
