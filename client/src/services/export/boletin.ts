@@ -83,7 +83,7 @@ export function exportBoletinToPDF(data: BoletinData) {
   doc.setFontSize(9.5);
   doc.setTextColor(...GRAY_TEXT);
   doc.text(
-    `Asistencia: ${data.asistenciaTasa}%    Ausencias: ${data.ausencias}    Tardanzas: ${data.tardanzas}`,
+    `Asistencia: ${data.asistenciaTasa}%    Ausencias: ${data.ausencias}    Inasist. justificadas: ${data.justificadas}`,
     marginX,
     y
   );

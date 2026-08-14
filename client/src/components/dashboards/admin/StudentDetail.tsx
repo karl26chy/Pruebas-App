@@ -9,7 +9,6 @@ import { averageBySubject, maxScoreFor, weightedAverage } from '../../../lib/gra
 import { countByStatus } from '../../../lib/attendance';
 import { getAge, initials } from '../../../lib/people';
 import { documentoCompleto } from '../../../lib/documentTypes';
-import { exportBoletinToPDF, type BoletinData } from '../../../services/export';
 import { AcademicHistoryView } from '../student/AcademicHistoryView';
 import type { Attendance, Institution, Mark, Subject, User } from '../../../types';
 
@@ -23,13 +22,14 @@ interface StudentDetailProps {
   average: number;
   attendanceRate: number;
   getSubjectName: (subjectId: string) => string;
-  buildBoletinData: (student: User) => BoletinData;
+  /** Abre la generación del boletín individual por período. */
+  onGenerateReport: (student: User) => void;
 }
 
 /** Ficha completa del estudiante: datos, asistencia, gráfica y notas. */
 export const StudentDetail: React.FC<StudentDetailProps> = ({
   student, institution, subjects, marks, attendance, gradeLabel,
-  average, attendanceRate, getSubjectName, buildBoletinData,
+  average, attendanceRate, getSubjectName, onGenerateReport,
 }) => {
   const studentMarks = useMemo(
     () => marks.filter(m => m.estudiante_id === student.id),
@@ -69,11 +69,11 @@ export const StudentDetail: React.FC<StudentDetailProps> = ({
               <div className="text-2xl font-bold">{average}</div>
             </div>
             <button
-              onClick={() => exportBoletinToPDF(buildBoletinData(student))}
-              title="Exportar boletín de este estudiante a PDF"
+              onClick={() => onGenerateReport(student)}
+              title="Generar boletín por período de este estudiante"
               className="flex items-center gap-1.5 px-3 py-1.5 bg-white/20 hover:bg-white/30 text-white rounded-lg text-xs font-medium transition-colors"
             >
-              <FileText className="h-3.5 w-3.5" /> Informes
+              <FileText className="h-3.5 w-3.5" /> Generar boletín
             </button>
             <button
               onClick={() => setShowHistory(v => !v)}
@@ -126,7 +126,7 @@ export const StudentDetail: React.FC<StudentDetailProps> = ({
         />
         <AttendanceBox
           icon={<Clock className="h-5 w-5 text-amber-600 mx-auto mb-1" />}
-          value={counts.tardanza} label="Tardanzas"
+          value={counts.justificada} label="Inasist. justificadas"
           className="bg-amber-50 border-amber-200" textClass="text-amber-600"
         />
       </div>
@@ -142,7 +142,7 @@ export const StudentDetail: React.FC<StudentDetailProps> = ({
           <SubjectPerformanceChart
             data={chartData}
             dataKey="Nota Promedio"
-            maxScore={maxScoreFor(institution?.tipo)}
+            maxScore={maxScoreFor(institution)}
             notaMinima={institution?.nota_minima_aprobacion}
             referenceLabel={`Mín (${institution?.nota_minima_aprobacion})`}
             height="h-64"

@@ -44,13 +44,21 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.nombre || !form.apellido || !form.email) return;
+    if (!form.nombre || !form.apellido) return;
+    if (esEstudiante && !form.tipo_documento) {
+      showMsg('error', 'Selecciona el tipo de documento.');
+      return;
+    }
+    if (esEstudiante && !(form.identificacion || '').trim()) {
+      showMsg('error', 'El número de identificación es obligatorio para estudiantes.');
+      return;
+    }
 
     try {
       const data: EditForm = {
         nombre: form.nombre,
         apellido: form.apellido,
-        email: form.email,
+        email: form.email || undefined,
         rol: form.rol as Role,
       };
       if (form.password) data.password = form.password;
@@ -112,8 +120,8 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
           </div>
 
           <div>
-            <label className={LABEL}>Email</label>
-            <input type="email" required value={form.email || ''} onChange={e => update({ email: e.target.value })} className={FIELD_FOCUS} />
+            <label className={LABEL}>Email (opcional)</label>
+            <input type="email" value={form.email || ''} onChange={e => update({ email: e.target.value })} className={FIELD_FOCUS} />
           </div>
 
           <div>
@@ -148,7 +156,7 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
                 </div>
                 <div>
                   <label className={LABEL}>Número de documento</label>
-                  <input type="text" value={form.identificacion || ''} onChange={e => update({ identificacion: e.target.value })} className={FIELD} />
+                  <input type="text" required value={form.identificacion || ''} onChange={e => update({ identificacion: e.target.value })} className={FIELD} />
                 </div>
               </div>
 

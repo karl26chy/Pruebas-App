@@ -150,7 +150,9 @@ export const AssignmentsTab: React.FC<AssignmentsTabProps> = ({
             <Field label="Materia">
               <select required value={subjectId} onChange={e => setSubjectId(e.target.value)} className={INPUT}>
                 <option value="">-- Seleccionar --</option>
-                {subjects.map(s => <option key={s.id} value={s.id}>{s.nombre}</option>)}
+                {subjects
+                  .filter(s => s.institucion_id === assignInstId)
+                  .map(s => <option key={s.id} value={s.id}>{s.nombre}</option>)}
               </select>
             </Field>
 

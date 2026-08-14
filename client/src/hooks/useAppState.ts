@@ -27,6 +27,7 @@ export function useAppState(): AppContextValue {
   const { user, authError, login, logout, restoreUser } = useAuthSession({
     institutions: collections.institutions,
     realSubdomain,
+    activeSubdomain,
     setSimulatedSubdomain,
     loadEverything,
     resetSessionCollections,

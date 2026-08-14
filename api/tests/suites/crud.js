@@ -91,7 +91,7 @@ export default async function crudSuite(world) {
     const res = await post('/users', {
       email: `pwd${world.id}@test.local`, password: 'secreto123', rol: 'student',
       nombre: 'P', apellido: 'W', institucion_id: world.inst.A.id, activo: true,
-      tipo_documento: 'TI',
+      tipo_documento: 'TI', identificacion: `IDPWD${world.id}`,
     }, world.tokens.adminA);
     equal(res.status, 201, 'status');
     notOk('password' in res.data, 'la respuesta no trae password');
@@ -103,6 +103,7 @@ export default async function crudSuite(world) {
     const creado = (await post('/users', {
       email, password: 'clave-original', rol: 'student', nombre: 'H', apellido: 'A',
       institucion_id: world.inst.A.id, activo: true, tipo_documento: 'CC',
+      identificacion: `IDHASH${world.id}`,
     }, world.tokens.adminA)).data;
     track(world, 'users', creado.id);
 
@@ -115,6 +116,7 @@ export default async function crudSuite(world) {
     const creado = (await post('/users', {
       email, password: 'primera', rol: 'student', nombre: 'R', apellido: 'H',
       institucion_id: world.inst.A.id, activo: true, tipo_documento: 'TI',
+      identificacion: `IDREH${world.id}`,
     }, world.tokens.adminA)).data;
     track(world, 'users', creado.id);
 
@@ -131,6 +133,7 @@ export default async function crudSuite(world) {
     const creado = (await post('/users', {
       email, password: 'inicial', rol: 'student', nombre: 'V', apellido: 'A',
       institucion_id: world.inst.A.id, activo: true, tipo_documento: 'PPT',
+      identificacion: `IDVAC${world.id}`,
     }, world.tokens.adminA)).data;
     track(world, 'users', creado.id);
 

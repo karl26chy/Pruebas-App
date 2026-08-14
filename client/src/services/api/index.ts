@@ -1,4 +1,5 @@
 import { authApi } from './auth.api';
+import { reportApi } from './report.api';
 import { createResourceApi } from './resource.api';
 import { http } from '../http';
 
@@ -40,6 +41,9 @@ export const api = {
   // Auth
   login: authApi.login,
   getMe: authApi.getMe,
+
+  // Reportes / boletines
+  getStudentReport: reportApi.getStudentReport,
 
   // Academic history
   getStudentAcademicHistory: (

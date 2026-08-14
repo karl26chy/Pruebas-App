@@ -5,6 +5,7 @@ import { useMessaging } from '../../../hooks/useMessaging';
 import { Card, EmptyMessage, Field, INPUT, Tabs, type TabItem } from '../../ui';
 import { MessageComposer, MessageThread, MessageDetailModal } from '../../messaging';
 import { useTeacherClass } from './useTeacherClass';
+import { periodLabel } from '../../../lib/periods';
 import { AttendanceTab } from './AttendanceTab';
 import { EvaluationsTab } from './EvaluationsTab';
 import { MarksTab } from './MarksTab';
@@ -108,7 +109,7 @@ export const TeacherDashboard: React.FC = () => {
                       >
                         {periods.map(p => (
                           <option key={p.id} value={p.id}>
-                            {p.nombre} — {p.anio}{p.activo ? '' : ' (cerrado)'}
+                            {periodLabel(p)}{p.activo ? '' : ' (cerrado)'}
                           </option>
                         ))}
                       </select>
@@ -134,6 +135,8 @@ export const TeacherDashboard: React.FC = () => {
               grade={activeGrade}
               students={gradeStudents}
               teacherId={user.id}
+              periods={periods}
+              period={activePeriod}
               onSaved={refreshData}
             />
           )}
@@ -159,6 +162,7 @@ export const TeacherDashboard: React.FC = () => {
               marks={marks}
               teacherId={user.id}
               notaMax={notaMax}
+              periodLabel={periodLabel(activePeriod)}
               onSaved={refreshData}
             />
           )}

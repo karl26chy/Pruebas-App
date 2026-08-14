@@ -55,15 +55,20 @@ export const CreateUserForm: React.FC<CreateUserFormProps> = ({
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !nombre || !apellido || !selectedInstId || !password) return;
+    if (!nombre || !apellido || !selectedInstId || !password) return;
     if (rol === 'student' && !tipoDocumento) {
       showMsg('error', 'Selecciona el tipo de documento.');
+      return;
+    }
+    if (rol === 'student' && !identificacion.trim()) {
+      showMsg('error', 'El número de identificación es obligatorio para estudiantes.');
       return;
     }
 
     try {
       const created = await api.createUser({
-        email, password, rol, nombre, apellido,
+        email: email || undefined,
+        password, rol, nombre, apellido,
         identificacion: identificacion || undefined,
         tipo_documento: rol === 'student' ? tipoDocumento : undefined,
         genero: genero || undefined,
@@ -109,11 +114,14 @@ export const CreateUserForm: React.FC<CreateUserFormProps> = ({
           </Field>
         </div>
 
-        <Field label="Email">
+        <Field label="Email (opcional)">
           <input
-            type="email" required value={email} onChange={e => setEmail(e.target.value)}
+            type="email" value={email} onChange={e => setEmail(e.target.value)}
             placeholder="usuario@colegio.com" className={INPUT}
           />
+          <p className="text-[11px] text-gray-400 mt-1">
+            Obligatorio para que el estudiante pueda iniciar sesión por correo; siempre puede hacerlo por identificación.
+          </p>
         </Field>
 
         <Field label="Contraseña">
@@ -157,7 +165,7 @@ export const CreateUserForm: React.FC<CreateUserFormProps> = ({
               </Field>
               <Field label="Número de documento">
                 <input
-                  type="text" value={identificacion} onChange={e => setIdentificacion(e.target.value)}
+                  type="text" required value={identificacion} onChange={e => setIdentificacion(e.target.value)}
                   placeholder="CC/TI" className={INPUT}
                 />
               </Field>

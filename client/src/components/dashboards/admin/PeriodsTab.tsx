@@ -5,6 +5,7 @@ import { PeriodForm } from './PeriodForm';
 import { PeriodConfirmModal } from './PeriodConfirmModal';
 import { useAcademicPeriods, type PeriodFormData } from './useAcademicPeriods';
 import { useApp } from '../../../context/useApp';
+import { periodLabel } from '../../../lib/periods';
 import type { AcademicPeriod } from '../../../types';
 
 /** "2026-08-10" → "10/08/2026" (sin depender de zona horaria). */
@@ -140,7 +141,9 @@ export const PeriodsTab: React.FC = () => {
               <TableBody>
                 {periods.map(p => (
                   <tr key={p.id} className="hover:bg-gray-50">
-                    <td className="py-3 font-semibold text-gray-900">{p.nombre}</td>
+                    <td className="py-3 font-semibold text-gray-900">
+                      {periodLabel(p)}
+                    </td>
                     <td className="py-3 text-gray-500">{p.numero}</td>
                     <td className="py-3 text-gray-500">{p.anio}</td>
                     <td className="py-3 text-gray-500">{formatFecha(p.fecha_inicio)}</td>

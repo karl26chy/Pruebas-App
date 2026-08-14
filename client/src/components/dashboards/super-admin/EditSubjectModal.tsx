@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
 import { api } from '../../../services/api';
-import type { Subject } from '../../../types';
+import type { Institution, Subject } from '../../../types';
 import type { Feedback } from './useSuperAdmin';
 
 const FIELD = 'w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none';
@@ -9,17 +9,20 @@ const LABEL = 'block text-xs font-medium text-gray-600 mb-1';
 
 interface EditSubjectModalProps {
   subject: Subject;
+  institutions: Institution[];
   showMsg: (type: Feedback['type'], text: string) => void;
   onClose: () => void;
   onChanged: () => Promise<void>;
 }
 
-/** Edición de una materia académica del catálogo global. */
+/** Edición de una materia académica; la institución no se cambia aquí. */
 export const EditSubjectModal: React.FC<EditSubjectModalProps> = ({
-  subject, showMsg, onClose, onChanged,
+  subject, institutions, showMsg, onClose, onChanged,
 }) => {
   const [nombre, setNombre] = useState(subject.nombre || '');
   const [descripcion, setDescripcion] = useState(subject.descripcion || '');
+
+  const institution = institutions.find(i => i.id === subject.institucion_id);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,6 +32,7 @@ export const EditSubjectModal: React.FC<EditSubjectModalProps> = ({
       await api.updateSubject(subject.id, {
         nombre,
         descripcion: descripcion || undefined,
+        institucion_id: subject.institucion_id,
       });
       onClose();
       showMsg('success', 'Materia actualizada.');
@@ -57,6 +61,11 @@ export const EditSubjectModal: React.FC<EditSubjectModalProps> = ({
         </div>
 
         <form onSubmit={handleSave} className="p-6 space-y-4">
+          <div>
+            <label className={LABEL}>Institución</label>
+            <input value={institution?.nombre || '—'} disabled className={FIELD} />
+          </div>
+
           <div>
             <label className={LABEL}>Nombre</label>
             <input type="text" required value={nombre} onChange={e => setNombre(e.target.value)} className={FIELD} />

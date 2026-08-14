@@ -18,6 +18,7 @@ export const StudentDashboard: React.FC = () => {
     user, currentInstitution, myGrade, myGradeAssignments, myTeachers,
     getSubjectName, getTeacherName, myMarks, chartData,
     myAttendance, attendanceCounts, presenceRate, myCitations, pendingCitations,
+    periods, periodLabelOf,
   } = useStudentDashboard();
 
   const [activeTab, setActiveTab] = useState<StudentTab>('grades');
@@ -94,6 +95,7 @@ export const StudentDashboard: React.FC = () => {
           marks={myMarks}
           institution={currentInstitution}
           getSubjectName={getSubjectName}
+          periodLabelOf={periodLabelOf}
         />
       )}
 
@@ -106,6 +108,7 @@ export const StudentDashboard: React.FC = () => {
           records={myAttendance}
           counts={attendanceCounts}
           presenceRate={presenceRate}
+          periods={periods}
           getSubjectName={getSubjectName}
           getTeacherName={getTeacherName}
         />

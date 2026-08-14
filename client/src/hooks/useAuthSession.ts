@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api, getAuthToken, setAuthToken, UNAUTHORIZED_EVENT } from '../services/api';
+import type { LoginPayload } from '../services/api/auth.api';
 import type { Institution, User } from '../types';
 
 const USER_KEY = 'edu_platform_user';
@@ -9,6 +10,8 @@ interface SessionDeps {
   institutions: Institution[];
   /** Subdominio real del host (p. ej. "alegria" en alegria.dominio.com). */
   realSubdomain: string | null;
+  /** Subdominio efectivo (real o simulado en localhost) para el login por identificación. */
+  activeSubdomain: string | null;
   setSimulatedSubdomain: (subdomain: string | null) => void;
   /** Recarga completa tras un login correcto. */
   loadEverything: () => Promise<void>;
@@ -32,6 +35,7 @@ interface SessionDeps {
 export function useAuthSession({
   institutions,
   realSubdomain,
+  activeSubdomain,
   setSimulatedSubdomain,
   loadEverything,
   resetSessionCollections,
@@ -75,11 +79,20 @@ export function useAuthSession({
     return false;
   };
 
-  const login = async (email: string, password: string): Promise<boolean> => {
+  /** El estudiante puede entrar con correo o con su número de identificación. */
+  const login = async (identifier: string, password: string): Promise<boolean> => {
     try {
       setAuthError(null);
       clearDataError();
-      const { token, user: authenticated } = await api.login(email, password);
+
+      const payload: LoginPayload = { password, subdominio: activeSubdomain };
+      if (identifier.includes('@')) {
+        payload.email = identifier;
+      } else {
+        payload.identificacion = identifier;
+      }
+
+      const { token, user: authenticated } = await api.login(payload);
       setAuthToken(token);
 
       const userInstitution = institutions.find(inst => inst.id === authenticated.institucion_id);

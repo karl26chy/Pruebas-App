@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Calendar, Edit3, Lock, Plus, Trash2 } from 'lucide-react';
 import { api } from '../../../services/api';
 import { Card, CardTitle, EmptyMessage, Field, INPUT, PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../ui';
+import { periodLabel } from '../../../lib/periods';
 import type { AcademicPeriod, Assignment, Evaluation } from '../../../types';
 
 interface EvaluationsTabProps {
@@ -23,6 +24,14 @@ export const EvaluationsTab: React.FC<EvaluationsTabProps> = ({
 
   const closed = period ? !period.activo : true;
 
+  const sumaOtros = evaluations
+    .filter(ev => ev.id !== editingId)
+    .reduce((acc, ev) => acc + (Number(ev.porcentaje) || 0), 0);
+  const sumaActual = evaluations.reduce((acc, ev) => acc + (Number(ev.porcentaje) || 0), 0);
+  const disponible = Math.max(0, 100 - sumaOtros);
+  const nuevoTotal = sumaOtros + (Number(form.porcentaje) || 0);
+  const excede = nuevoTotal > 100;
+
   const cancelEdit = () => {
     setEditingId(null);
     setForm(VACIO);
@@ -31,6 +40,10 @@ export const EvaluationsTab: React.FC<EvaluationsTabProps> = ({
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.nombre || !form.fecha || !period) return;
+    if (excede) {
+      alert(`La suma de porcentajes de esta materia, grado y período no puede superar 100%. Actual: ${sumaOtros}% — solo quedan ${disponible}%.`);
+      return;
+    }
     try {
       const data = {
         institucion_id: assignment.institucion_id,
@@ -112,10 +125,14 @@ export const EvaluationsTab: React.FC<EvaluationsTabProps> = ({
               </Field>
               <Field label="Porcentaje (%)">
                 <input
-                  type="number" min="1" max="100" required value={form.porcentaje}
+                  type="number" min="1" max={disponible} required value={form.porcentaje}
                   onChange={e => setForm({ ...form, porcentaje: Number(e.target.value) })}
                   className={INPUT}
                 />
+                <p className="mt-1 text-xs text-gray-500">
+                  Total actual: <span className="font-semibold">{sumaOtros}%</span> · Disponible:{' '}
+                  <span className="font-semibold">{disponible}%</span>
+                </p>
               </Field>
             </div>
 
@@ -134,7 +151,9 @@ export const EvaluationsTab: React.FC<EvaluationsTabProps> = ({
       </Card>
 
       <Card>
-        <CardTitle className="mb-6">Evaluaciones del Periodo</CardTitle>
+        <CardTitle className="mb-6">
+          Evaluaciones del Periodo {period ? <span className="text-q10-600">— {periodLabel(period)}</span> : null}
+        </CardTitle>
         <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
           {evaluations.length === 0 ? (
             <EmptyMessage>No hay evaluaciones en este periodo para esta materia/grado.</EmptyMessage>
@@ -173,6 +192,14 @@ export const EvaluationsTab: React.FC<EvaluationsTabProps> = ({
               </div>
             ))
           )}
+        </div>
+        <div className={`mt-4 pt-3 border-t border-gray-100 flex justify-between items-center text-sm ${sumaActual > 100 ? 'text-red-600' : 'text-gray-600'}`}>
+          <span>
+            Total porcentajes: <strong>{sumaActual}%</strong>
+          </span>
+          <span>
+            Disponible: <strong>{Math.max(0, 100 - sumaActual)}%</strong>
+          </span>
         </div>
       </Card>
     </div>

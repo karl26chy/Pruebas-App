@@ -3,8 +3,9 @@ import { ChevronDown, ChevronRight, GraduationCap, History, Loader2 } from 'luci
 import { api } from '../../../services/api';
 import { Card, CardTitle, EmptyMessage, ExportButtons } from '../../ui';
 import { weightedAverage } from '../../../lib/grades';
+import { periodLabel } from '../../../lib/periods';
 import { documentoCompleto } from '../../../lib/documentTypes';
-import type { AcademicHistory, AcademicHistorySubject } from '../../../types';
+import type { AcademicHistory, AcademicHistorySubject, AcademicHistoryPeriod } from '../../../types';
 
 interface AcademicHistoryViewProps {
   /** ID del estudiante cuyo historial se consulta. */
@@ -22,6 +23,14 @@ function formatFecha(fecha?: string | null): string {
 
 const promedioMateria = (subject: AcademicHistorySubject): number =>
   weightedAverage(subject.evaluations.map(ev => ({ nota: ev.nota, porcentaje: ev.porcentaje ?? 0 })));
+
+/** "Periodo N — nombre — año" cuando el backend trae los datos del periodo. */
+const historyPeriodLabel = (p: AcademicHistoryPeriod): string => {
+  if (p.numero || p.nombre || p.anio) {
+    return periodLabel({ numero: p.numero ?? null, nombre: p.nombre || p.period, anio: p.anio ?? null });
+  }
+  return p.period;
+};
 
 /**
  * Historial académico individual por estudiante: Año → Periodo → Grado →
@@ -69,9 +78,9 @@ export const AcademicHistoryView: React.FC<AcademicHistoryViewProps> = ({ studen
       for (const p of y.periods) {
         for (const s of p.subjects) {
           const avg = promedioMateria(s);
-          rows.push([y.year, p.period, p.grade?.label ?? '', s.subject, 'Promedio', avg]);
+          rows.push([y.year, historyPeriodLabel(p), p.grade?.label ?? '', s.subject, 'Promedio', avg]);
           for (const ev of s.evaluations) {
-            rows.push([y.year, p.period, p.grade?.label ?? '', s.subject, ev.tipo_evaluacion, ev.nota]);
+            rows.push([y.year, historyPeriodLabel(p), p.grade?.label ?? '', s.subject, ev.tipo_evaluacion, ev.nota]);
           }
         }
       }
@@ -151,7 +160,7 @@ export const AcademicHistoryView: React.FC<AcademicHistoryViewProps> = ({ studen
                           className="w-full flex items-center justify-between px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
                         >
                           <span>
-                            {period.period}
+                            {historyPeriodLabel(period)}
                             {period.grade && (
                               <span className="ml-2 text-xs font-medium text-gray-400">Grado: {period.grade.label}</span>
                             )}

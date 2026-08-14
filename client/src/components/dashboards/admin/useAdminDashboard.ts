@@ -53,11 +53,11 @@ export function useAdminDashboard() {
 
   /** El gráfico de tarta necesita un valor mínimo para dibujarse vacío. */
   const attendancePieData = useMemo(() => {
-    const { presente, ausente, tardanza } = countByStatus(instAttendance);
+    const { presente, ausente, justificada } = countByStatus(instAttendance);
     return [
       { name: 'Presente', value: presente || 1 },
       { name: 'Ausente', value: ausente || 1 },
-      { name: 'Tardanza', value: tardanza || 1 },
+      { name: 'Inasist. justificada', value: justificada || 1 },
     ];
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [attendance, studentUsers]);
@@ -115,7 +115,7 @@ export function useAdminDashboard() {
       notaMinima: currentInstitution?.nota_minima_aprobacion ?? 0,
       asistenciaTasa: getStudentAttendanceRate(student.id),
       ausencias: counts.ausente,
-      tardanzas: counts.tardanza,
+      justificadas: counts.justificada,
       fileName: `boletin_${fileSlug(student)}`,
     };
   };

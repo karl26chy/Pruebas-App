@@ -54,7 +54,7 @@ export async function buildWorld() {
     apellido: 'Test',
     institucion_id,
     activo: true,
-    ...(rol === 'student' ? { tipo_documento: 'TI' } : {}),
+    ...(rol === 'student' ? { tipo_documento: 'TI', identificacion: `${tag}.${id}` } : {}),
     ...extra,
   }, su);
 
@@ -86,9 +86,10 @@ export async function buildWorld() {
     tipo_grado: 'B',
   }, su);
 
-  // Las materias son un catálogo global (la tabla no tiene institucion_id).
-  const subjectX = await create('subjects', { nombre: `Matematicas ${id}`, descripcion: 'Test' }, su);
-  const subjectY = await create('subjects', { nombre: `Sociales ${id}`, descripcion: 'Test' }, su);
+  // Las materias pertenecen a una institución (X e Y en A, Z en B).
+  const subjectX = await create('subjects', { nombre: `Matematicas ${id}`, descripcion: 'Test', institucion_id: instA.id }, su);
+  const subjectY = await create('subjects', { nombre: `Sociales ${id}`, descripcion: 'Test', institucion_id: instA.id }, su);
+  const subjectZ = await create('subjects', { nombre: `Ciencias ${id}`, descripcion: 'Test', institucion_id: instB.id }, su);
 
   const assignA = await create('assignments', {
     profesor_id: teacherA.id,
@@ -169,7 +170,7 @@ export async function buildWorld() {
     inst: { A: instA, B: instB },
     users: { adminA, teacherA, teacherA2, studentA, studentA2, adminB, teacherB, studentB, inactiveUser },
     grades: { A: gradeA, B: gradeB },
-    subjects: { X: subjectX, Y: subjectY },
+    subjects: { X: subjectX, Y: subjectY, Z: subjectZ },
     assignments: { A: assignA },
     enrollments: { A: enrollA },
     periods: { A: periodA, B: periodB },
@@ -201,7 +202,7 @@ export async function destroyWorld(world) {
   }
   await del(`/student_grades/${world.enrollments.A.id}`, su).catch(() => {});
   await del(`/assignments/${world.assignments.A.id}`, su).catch(() => {});
-  for (const s of [world.subjects.X, world.subjects.Y]) {
+  for (const s of [world.subjects.X, world.subjects.Y, world.subjects.Z]) {
     await del(`/subjects/${s.id}`, su).catch(() => {});
   }
   for (const u of Object.values(world.users)) {

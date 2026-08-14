@@ -1,11 +1,12 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { Eye, Filter, Search, X } from 'lucide-react';
+import { Edit3, Eye, FileText, Filter, Search, UserPlus, X } from 'lucide-react';
 import { Card, EmptyMessage, Field, INPUT } from '../../ui';
 import { useClickOutside } from '../../../hooks/useClickOutside';
 import { getAge } from '../../../lib/people';
 import { documentoCompleto } from '../../../lib/documentTypes';
 import { StudentDetail } from './StudentDetail';
-import type { BoletinData } from '../../../services/export';
+import { StudentFormModal } from './StudentFormModal';
+import { BoletinModal } from './BoletinModal';
 import type { Attendance, Grade, Institution, Mark, StudentGrade, Subject, User } from '../../../types';
 
 interface StudentsTabProps {
@@ -20,13 +21,14 @@ interface StudentsTabProps {
   getStudentGradeLabel: (studentId: string) => string;
   getStudentAverage: (studentId: string) => number;
   getStudentAttendanceRate: (studentId: string) => number;
-  buildBoletinData: (student: User) => BoletinData;
+  onChanged: () => Promise<void>;
 }
 
-/** Buscador, filtros y ficha detallada de los estudiantes de la institución. */
+/** Buscador, filtros, ficha detallada y gestión de estudiantes de la institución. */
 export const StudentsTab: React.FC<StudentsTabProps> = ({
   students, grades, studentGrades, subjects, marks, attendance, institution,
-  getSubjectName, getStudentGradeLabel, getStudentAverage, getStudentAttendanceRate, buildBoletinData,
+  getSubjectName, getStudentGradeLabel, getStudentAverage, getStudentAttendanceRate,
+  onChanged,
 }) => {
   const [genero, setGenero] = useState('');
   const [edadMin, setEdadMin] = useState(0);
@@ -35,10 +37,15 @@ export const StudentsTab: React.FC<StudentsTabProps> = ({
   const [selected, setSelected] = useState<User | null>(null);
   const [query, setQuery] = useState('');
   const [showAutocomplete, setShowAutocomplete] = useState(false);
+  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [formMode, setFormMode] = useState<'new' | User | null>(null);
+  const [reportStudent, setReportStudent] = useState<User | null>(null);
 
   const searchRef = useRef<HTMLDivElement>(null);
   const closeAutocomplete = useCallback(() => setShowAutocomplete(false), []);
   useClickOutside(searchRef, closeAutocomplete);
+
+  const showMsg = (type: 'success' | 'error', text: string) => setFeedback({ type, text });
 
   const searchResults = useMemo(() => {
     if (!query.trim()) return [];
@@ -77,7 +84,14 @@ export const StudentsTab: React.FC<StudentsTabProps> = ({
   return (
     <div className="animate-fade-in space-y-6">
       <Card className="p-5 space-y-4">
-        <div ref={searchRef} className="relative">
+        {feedback && (
+          <div className={`p-3 rounded-xl border text-sm ${feedback.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-600' : 'bg-red-50 border-red-200 text-red-600'}`}>
+            {feedback.text}
+          </div>
+        )}
+
+        <div className="flex items-center justify-between gap-4">
+          <div ref={searchRef} className="relative flex-1">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
             <input
@@ -121,6 +135,14 @@ export const StudentsTab: React.FC<StudentsTabProps> = ({
               ))}
             </div>
           )}
+        </div>
+
+        <button
+          onClick={() => setFormMode('new')}
+          className="inline-flex items-center gap-2 px-4 py-2.5 bg-q10-600 hover:bg-q10-700 text-white font-semibold rounded-xl text-sm transition-colors shrink-0"
+        >
+          <UserPlus className="h-4 w-4" /> Crear Estudiante
+        </button>
         </div>
 
         <div className="flex items-center gap-2">
@@ -170,20 +192,38 @@ export const StudentsTab: React.FC<StudentsTabProps> = ({
               <EmptyMessage>Sin resultados.</EmptyMessage>
             ) : (
               filteredStudents.map(s => (
-                <button
+                <div
                   key={s.id}
-                  onClick={() => setSelected(selected?.id === s.id ? null : s)}
-                  className={`w-full text-left p-3 rounded-xl border text-sm transition-all ${
+                  className={`flex items-center gap-1 p-3 rounded-xl border text-sm transition-all ${
                     selected?.id === s.id
-                      ? 'bg-q10-50 border-q10-500 text-q10-600'
+                      ? 'bg-q10-50 border-q10-500'
                       : 'bg-white border-gray-200 hover:border-gray-300'
                   }`}
                 >
-                  <span className="font-semibold block">{s.nombre} {s.apellido}</span>
-                  <span className="text-xs text-gray-500 block mt-0.5">
-                    {getStudentGradeLabel(s.id)} · {getAge(s.fecha_nacimiento)} años · {s.genero || 'N/E'}
-                  </span>
-                </button>
+                  <button
+                    onClick={() => setSelected(selected?.id === s.id ? null : s)}
+                    className="flex-1 min-w-0 text-left"
+                  >
+                    <span className="font-semibold block">{s.nombre} {s.apellido}</span>
+                    <span className="text-xs text-gray-500 block mt-0.5">
+                      {getStudentGradeLabel(s.id)} · {getAge(s.fecha_nacimiento)} años · {s.genero || 'N/E'}
+                    </span>
+                  </button>
+                  <button
+                    onClick={() => setReportStudent(s)}
+                    title="Generar boletín"
+                    className="p-1.5 rounded-lg text-gray-400 hover:text-q10-600 hover:bg-q10-50 transition-colors shrink-0"
+                  >
+                    <FileText className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() => setFormMode(s)}
+                    title="Editar estudiante"
+                    className="p-1.5 rounded-lg text-gray-400 hover:text-amber-600 hover:bg-amber-50 transition-colors shrink-0"
+                  >
+                    <Edit3 className="h-4 w-4" />
+                  </button>
+                </div>
               ))
             )}
           </div>
@@ -208,11 +248,25 @@ export const StudentsTab: React.FC<StudentsTabProps> = ({
               average={getStudentAverage(selected.id)}
               attendanceRate={getStudentAttendanceRate(selected.id)}
               getSubjectName={getSubjectName}
-              buildBoletinData={buildBoletinData}
+              onGenerateReport={s => setReportStudent(s)}
             />
           )}
         </Card>
       </div>
+
+      {formMode && (
+        <StudentFormModal
+          institution={institution}
+          student={formMode === 'new' ? null : formMode}
+          onClose={() => setFormMode(null)}
+          onSaved={onChanged}
+          showMsg={showMsg}
+        />
+      )}
+
+      {reportStudent && (
+        <BoletinModal student={reportStudent} onClose={() => setReportStudent(null)} />
+      )}
     </div>
   );
 };

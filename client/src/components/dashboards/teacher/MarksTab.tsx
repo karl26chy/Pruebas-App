@@ -12,6 +12,8 @@ interface MarksTabProps {
   marks: Mark[];
   teacherId: string;
   notaMax: number;
+  /** Etiqueta del periodo activo, p. ej. "Periodo 1 — Primer periodo — 2026". */
+  periodLabel?: string;
   onSaved: () => Promise<void>;
 }
 
@@ -20,7 +22,7 @@ interface MarksTabProps {
  * nota en esa evaluación se actualiza, no se duplica.
  */
 export const MarksTab: React.FC<MarksTabProps> = ({
-  assignment, subject, grade, students, evaluations, marks, teacherId, notaMax, onSaved,
+  assignment, subject, grade, students, evaluations, marks, teacherId, notaMax, periodLabel, onSaved,
 }) => {
   const [selectedEvalId, setSelectedEvalId] = useState('');
   const [drafts, setDrafts] = useState<Record<string, number>>({});
@@ -104,7 +106,7 @@ export const MarksTab: React.FC<MarksTabProps> = ({
           <option value="">-- Seleccionar Evaluación --</option>
           {evaluations.map(ev => (
             <option key={ev.id} value={ev.id}>
-              {ev.nombre} ({ev.fecha_evaluacion}) - {ev.porcentaje}% - {ev.periodo}
+              {ev.nombre} ({ev.fecha_evaluacion}) - {ev.porcentaje}% - {periodLabel || ev.periodo}
             </option>
           ))}
         </select>

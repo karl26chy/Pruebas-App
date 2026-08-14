@@ -85,7 +85,9 @@ export const EditAssignmentModal: React.FC<EditAssignmentModalProps> = ({
             <label className={LABEL}>Materia</label>
             <select required value={materiaId} onChange={e => setMateriaId(e.target.value)} className={FIELD}>
               <option value="">-- Seleccionar --</option>
-              {subjects.map(s => <option key={s.id} value={s.id}>{s.nombre}</option>)}
+              {subjects
+                .filter(s => s.institucion_id === assignment.institucion_id)
+                .map(s => <option key={s.id} value={s.id}>{s.nombre}</option>)}
             </select>
           </div>
 

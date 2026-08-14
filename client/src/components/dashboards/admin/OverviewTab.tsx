@@ -63,7 +63,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
             <SubjectPerformanceChart
               data={subjectData}
               dataKey="Promedio"
-              maxScore={maxScoreFor(institution?.tipo)}
+              maxScore={maxScoreFor(institution)}
               notaMinima={institution?.nota_minima_aprobacion}
               referenceLabel={`Mín (${institution?.nota_minima_aprobacion})`}
             />

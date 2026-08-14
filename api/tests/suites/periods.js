@@ -1,7 +1,7 @@
 import { get, post, put, del } from '../helpers/http.js';
 import { track } from '../helpers/fixtures.js';
 import { query as dbQuery } from '../helpers/db.js';
-import { suite, test, equal, ok, expectError } from '../helpers/runner.js';
+import { suite, test, equal, ok, notOk, expectError } from '../helpers/runner.js';
 
 /**
  * Sistema de periodos académicos:
@@ -90,7 +90,7 @@ export default async function periodsSuite(world) {
 
     expectError(
       await post('/evaluations', {
-        institucion_id: instB.id, materia_id: world.subjects.X.id,
+        institucion_id: instB.id, materia_id: world.subjects.Z.id,
         grado_id: world.grades.B.id, nombre: `Eval ${world.id}`,
         fecha_evaluacion: '2026-05-01', porcentaje: 10, creado_por: world.users.adminB.id,
       }, adminB),
@@ -117,7 +117,7 @@ export default async function periodsSuite(world) {
     try {
       expectError(
         await post('/evaluations', {
-          institucion_id: instB.id, materia_id: world.subjects.X.id,
+          institucion_id: instB.id, materia_id: world.subjects.Z.id,
           grado_id: world.grades.B.id, nombre: `Eval ${world.id}`,
           fecha_evaluacion: '2026-05-01', porcentaje: 10, creado_por: world.users.adminB.id,
         }, adminB),
@@ -261,6 +261,32 @@ export default async function periodsSuite(world) {
       }, adminB),
       403
     );
+  });
+
+  // ---- Nombre y número independientes -------------------------------------
+
+  await test('el número del periodo se mantiene separado del nombre', async () => {
+    const res = await post('/academic_periods', {
+      institucion_id: instA.id, nombre: 'Primer periodo', numero: 2, anio: 2026,
+      fecha_inicio: '2026-01-01', fecha_fin: '2026-12-31', activo: false,
+    }, adminA);
+    equal(res.status, 201, 'status');
+    equal(res.data.nombre, 'Primer periodo', 'el nombre es solo descriptivo');
+    equal(res.data.numero, 2, 'el número vive en su propio campo');
+    notOk(String(res.data.nombre).includes('2'), 'el número NO se duplica en el nombre');
+    track(world, 'academic_periods', res.data.id);
+  });
+
+  await test('el número se devuelve correctamente desde la API', async () => {
+    const creado = (await post('/academic_periods', {
+      institucion_id: instA.id, nombre: 'Primer periodo', numero: 1, anio: 2026,
+      fecha_inicio: '2026-01-01', fecha_fin: '2026-12-31', activo: false,
+    }, adminA)).data;
+    track(world, 'academic_periods', creado.id);
+
+    const porId = (await get(`/academic_periods/${creado.id}`, adminA)).data;
+    equal(porId.numero, 1, 'GET por id trae el número');
+    equal(porId.nombre, 'Primer periodo', 'GET por id trae el nombre descriptivo');
   });
 
   // ---- Borrado de periodos -------------------------------------------------
