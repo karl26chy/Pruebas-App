@@ -34,3 +34,7 @@ Desktop.ini
 
 # API
 api/node_modules/
+
+# Skills de agentes (opencode / skills CLI)
+.agents/
+skills-lock.json
