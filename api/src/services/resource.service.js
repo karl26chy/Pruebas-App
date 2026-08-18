@@ -1,5 +1,7 @@
 import { pickColumns, secretCols } from '../repositories/registry.js';
 import * as repo from '../repositories/resource.repository.js';
+import * as reportRepo from '../repositories/report.repository.js';
+import { availableTemplates } from './pdf/latex/templates/registry.js';
 import { buildReadScope } from '../policies/read-scope.policy.js';
 import { authorizeWrite } from '../policies/write-access.policy.js';
 import { validateRow } from '../validators/index.js';
@@ -32,13 +34,28 @@ function ensureYear(resource, data) {
 }
 
 export function listAll(resource, user) {
-  return repo.list(resource, buildReadScope(resource, user));
+  return enrichInstitutions(resource, repo.list(resource, buildReadScope(resource, user)));
 }
 
 export async function getById(resource, id, user) {
   const row = await repo.findById(resource, id, buildReadScope(resource, user));
   if (!row) throw notFound();
-  return row;
+  return (await enrichInstitutions(resource, [row]))[0];
+}
+
+/**
+ * Adjunta `boletin_template` (el formato de boletín) a cada institución leída.
+ * El formato NO vive en `institutions` sino en `institution_report_configs`;
+ * este enriquecimiento de solo-lectura permite a la UI mostrar y preservar la
+ * selección al editar, sin añadir columnas a la tabla `institutions`.
+ */
+async function enrichInstitutions(resource, rowsPromise) {
+  if (resource !== 'institutions') return rowsPromise;
+  const rows = await rowsPromise;
+  for (const row of rows) {
+    row.boletin_template = await reportRepo.reportTemplateFor(row.id);
+  }
+  return rows;
 }
 
 export async function create(resource, body, user) {
@@ -47,6 +64,7 @@ export async function create(resource, body, user) {
   await validateRow(resource, data, null);
   await hashSecrets(resource, data);
   ensureYear(resource, data);
+  await validateBoletinTemplate(resource, body);
 
   if (resource === 'academic_periods') {
     // Crear un periodo nunca abre silenciosamente el periodo actual: si no se
@@ -55,7 +73,9 @@ export async function create(resource, body, user) {
     if (data.activo === true) return repo.insertOpenPeriod(data);
   }
 
-  return repo.insert(resource, data);
+  const row = await repo.insert(resource, data);
+  await applyBoletinTemplate(resource, body, row);
+  return row;
 }
 
 export async function replace(resource, id, body, user) {
@@ -67,6 +87,7 @@ export async function replace(resource, id, body, user) {
   await validateRow(resource, data, existing);
   await hashSecrets(resource, data);
   ensureYear(resource, data);
+  await validateBoletinTemplate(resource, body);
 
   if (resource === 'academic_periods' && data.activo === true) {
     // Abrir un periodo cierra los demás de la institución, transaccionalmente.
@@ -77,12 +98,36 @@ export async function replace(resource, id, body, user) {
 
   const row = await repo.update(resource, id, data);
   if (!row) throw notFound();
+  await applyBoletinTemplate(resource, body, row);
   return row;
+}
+
+/** Valida que el formato de boletín enviado exista en el registro de plantillas. */
+async function validateBoletinTemplate(resource, body) {
+  if (resource !== 'institutions') return;
+  if (!body || !('boletin_template' in body)) return;
+  const template = body.boletin_template;
+  if (template !== undefined && template !== null && template !== '' && !availableTemplates().includes(template)) {
+    throw new HttpError(400, 'El formato de boletín seleccionado no está disponible.');
+  }
+}
+
+/**
+ * Persiste el formato de boletín elegido por el Super Admin en
+ * `institution_report_configs.config.template`. `boletin_template` NO es una
+ * columna de `institutions`: se captura del cuerpo y se aplica por separado,
+ * preservando el resto de la configuración de boletín de la institución.
+ */
+async function applyBoletinTemplate(resource, body, row) {
+  if (resource !== 'institutions') return;
+  if (!body || !('boletin_template' in body)) return;
+  await reportRepo.upsertReportTemplate(row.id, body.boletin_template);
 }
 
 const DEP_LABELS = {
   usuarios: 'usuarios',
   grados: 'grados',
+  materias: 'materias',
   asignaciones: 'asignaciones',
   evaluaciones: 'evaluaciones',
   registros_academicos: 'registros académicos',
@@ -177,6 +222,7 @@ export async function destroy(resource, id, user) {
     const partes = [];
     if (deps.evaluaciones > 0) partes.push(`${deps.evaluaciones} evaluaciones`);
     if (deps.notas > 0) partes.push(`${deps.notas} notas`);
+    if (deps.asistencias > 0) partes.push(`${deps.asistencias} asistencias`);
     if (partes.length > 0) {
       throw new HttpError(409, `No se puede eliminar este periodo porque tiene datos asociados: ${partes.join(', ')}.`);
     }
@@ -199,6 +245,15 @@ export async function destroy(resource, id, user) {
         if (periodo && periodo.activo === false) {
           throw new HttpError(409, 'El periodo está cerrado; no se puede eliminar la nota.');
         }
+      }
+    }
+  }
+
+  if (resource === 'attendance') {
+    if (existing.periodo_id) {
+      const periodo = await repo.periodById(existing.periodo_id);
+      if (periodo && periodo.activo === false) {
+        throw new HttpError(409, 'El periodo está cerrado; no se puede eliminar la asistencia.');
       }
     }
   }

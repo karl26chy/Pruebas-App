@@ -1,26 +1,28 @@
 import React, { useState } from 'react';
-import { Building2, BookOpen, CheckCircle2, Link2, ShieldAlert, Users } from 'lucide-react';
+import { Building2, BookOpen, Link2, Palette, Users } from 'lucide-react';
 import { StatCard, Tabs, type TabItem } from '../../ui';
 import { useSuperAdmin } from './useSuperAdmin';
 import { InstitutionsTab } from './InstitutionsTab';
 import { UsersTab } from './UsersTab';
 import { GradesSubjectsTab } from './GradesSubjectsTab';
 import { AssignmentsTab } from './AssignmentsTab';
+import { ReportTemplatesTab } from './ReportTemplatesTab';
 
-type SuperAdminTab = 'institutions' | 'users' | 'grades_subjects' | 'assignments';
+type SuperAdminTab = 'institutions' | 'users' | 'grades_subjects' | 'assignments' | 'report_templates';
 
 const TABS: TabItem<SuperAdminTab>[] = [
   { id: 'institutions', label: 'Instituciones', icon: <Building2 className="h-4 w-4" /> },
   { id: 'users', label: 'Usuarios', icon: <Users className="h-4 w-4" /> },
   { id: 'grades_subjects', label: 'Grados y Materias', icon: <BookOpen className="h-4 w-4" /> },
   { id: 'assignments', label: 'Asignaciones', icon: <Link2 className="h-4 w-4" /> },
+  { id: 'report_templates', label: 'Formatos de Boletín', icon: <Palette className="h-4 w-4" /> },
 ];
 
 export const SuperAdminDashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState<SuperAdminTab>('institutions');
   const {
     institutions, users, grades, subjects, assignments, studentGrades, refreshData,
-    feedback, showMsg, getGradeLabel, getSubjectLabel, getUserLabel, getInstName,
+    showMsg, getGradeLabel, getSubjectLabel, getUserLabel, getInstName,
   } = useSuperAdmin();
 
   const activeCount = institutions.filter(i => i.activa).length;
@@ -43,17 +45,6 @@ export const SuperAdminDashboard: React.FC = () => {
         <StatCard label="Administradores" value={adminCount} valueClassName="text-amber-600" />
         <StatCard label="Usuarios Totales" value={users.length} valueClassName="text-blue-600" />
       </div>
-
-      {feedback && (
-        <div className={`p-4 rounded-xl border text-sm flex items-center gap-2 ${
-          feedback.type === 'success'
-            ? 'bg-emerald-50 border-emerald-200 text-emerald-600'
-            : 'bg-red-50 border-red-200 text-red-600'
-        }`}>
-          {feedback.type === 'success' ? <CheckCircle2 className="h-5 w-5" /> : <ShieldAlert className="h-5 w-5" />}
-          {feedback.text}
-        </div>
-      )}
 
       <Tabs items={TABS} active={activeTab} onChange={setActiveTab} scrollable />
 
@@ -96,6 +87,10 @@ export const SuperAdminDashboard: React.FC = () => {
           showMsg={showMsg}
           onChanged={refreshData}
         />
+      )}
+
+      {activeTab === 'report_templates' && (
+        <ReportTemplatesTab showMsg={showMsg} />
       )}
     </div>
   );

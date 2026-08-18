@@ -10,9 +10,12 @@ export interface Institution {
   id: string;
   nombre: string;
   subdominio: string;
-  tipo: 'colegio' | 'universidad';
+  tipo: 'colegio' | 'corporacion' | 'universidad';
+  escala_maxima: number;
   nota_minima_aprobacion: number;
   activa: boolean;
+  /** Formato de boletín asignado (solo lectura; vive en institution_report_configs). */
+  boletin_template?: string;
 }
 
 export interface User {
@@ -42,6 +45,7 @@ export interface Grade {
 
 export interface Subject {
   id: string;
+  institucion_id: string;
   nombre: string;
   descripcion: string;
 }
@@ -66,7 +70,8 @@ export interface Attendance {
   materia_id: string;
   grado_id: string;
   fecha: string;
-  estado: 'presente' | 'ausente' | 'tardanza';
+  estado: 'presente' | 'ausente' | 'justificada';
+  periodo_id?: string | null;
   registrado_por: string;
 }
 
@@ -154,6 +159,10 @@ export interface AcademicHistorySubject {
 
 export interface AcademicHistoryPeriod {
   period: string;
+  periodo_id?: string | null;
+  numero?: number | null;
+  nombre?: string | null;
+  anio?: number | null;
   grade: { id: string; label: string } | null;
   subjects: AcademicHistorySubject[];
 }
@@ -173,4 +182,13 @@ export interface AcademicHistory {
     tipo_documento: string | null;
   };
   years: AcademicHistoryYear[];
+}
+
+/** Formato de boletín disponible (catálogo que expone el backend). */
+export interface ReportTemplateInfo {
+  id: string;
+  name: string;
+  description: string;
+  pdf: boolean;
+  excel: boolean;
 }

@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "test": "node --test src/lib/subdomain.test.ts",
+    "test": "node --test src/lib/subdomain.test.ts src/lib/periods.test.ts src/lib/subjectColors.test.ts src/lib/academicStatus.test.ts src/lib/studentFilters.test.ts src/lib/loginPayload.test.ts",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -18,6 +18,7 @@
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "recharts": "^3.8.1",
+    "sweetalert2": "^11.26.25",
     "tailwindcss": "^4.3.1",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
