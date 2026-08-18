@@ -1,6 +1,5 @@
 import {
   escapeLaTeX,
-  mergeConfig,
   textOrNa,
   configText,
   desempenoBands,
@@ -10,18 +9,36 @@ import {
  * Plantilla institucional "liceo_alegre_juventud" del boletín por período
  * (LaTeX/Tectonic).
  *
- * Replica la identidad visual del Liceo Alegre Juventud que ya existe en el
- * frontend (client/src/lib/reports/renderers/liceo.ts): franja institucional
- * superior, paleta dorado (#887030) + tinta (#303030), encabezado con logo e
- * institución y las mismas secciones que la plantilla "default"
- * (estudiante, resumen, desempeño, asistencia, observaciones, escala, firmas).
+ * EL TEMPLATE ES UNA UNIDAD COMPLETA DE DISEÑO:
+ *  · Su identidad visual es INHERENTE (no depende de que la institución tenga
+ *    colores configurados en `institution_report_configs`).
+ *  · Paleta propia: primary/dorado #887030, secondary/tinta #303030.
+ *  · Si `institution_report_configs` trae `primaryColor`/`secondaryColor`
+ *    explícitos, estos sobrescriben los defaults (arquitectura vigente).
  *
- * SOLO PRESENTA información: no consulta la BD, no calcula notas y no verifica
- * permisos. Los datos llegan ya resueltos en AcademicReportData. Reutiliza los
- * helpers y la maquinaria de render del directorio de plantillas.
+ * Diseño institucional aprobado (referencia: client/src/lib/reports/renderers/liceo.ts):
+ *   FRANJA SUPERIOR institucional (dorado) con nombre de la institución
+ *   ENCABEZADO (logo centrado · institución · título)
+ *   INFORMACIÓN DEL ESTUDIANTE + RESUMEN ACADÉMICO (tarjetas con borde dorado)
+ *   DESEMPEÑO ACADÉMICO (tabla con cabecera tinta y zebra dorada)
+ *   LEYENDA DE DESEMPEÑO
+ *   ASISTENCIA + OBSERVACIONES
+ *   ESCALA DE EVALUACIÓN INSTITUCIONAL (franja dorada)
+ *   FIRMAS (Rector(a) · Director(a) de grupo)
+ *   PIE (franja tinta)
+ *
+ * SOLO PRESENTA información: no consulta la BD, no calcula notas ni verifica
+ * permisos. Los datos llegan ya resueltos en AcademicReportData (por período).
  */
 
 const TEXTW = 19.0; // cm: A4 (21) - márgenes laterales (1.0×2)
+
+// Paleta institucional del Liceo (defaults PROPIOS del template).
+const LICEO_DEFAULTS = {
+  primary: '887030', // dorado institucional
+  secondary: '303030', // tinta
+};
+
 const FIXED = {
   num: 0.35,
   doc: 2.25,
@@ -60,6 +77,7 @@ function bandRange(b) {
   return `${lo}–${hi}`;
 }
 
+/** Color funcional de una letra de desempeño (S/A→éxito, B→aviso, Z→peligro). */
 function bandColor(letra) {
   const l = String(letra || '').toUpperCase();
   if (l === 'Z') return 'Danger';
@@ -89,8 +107,31 @@ function resumenChip(estado) {
   return `\\parbox{2.6cm}{\\centering ${estadoChip(estado)}}`;
 }
 
+/**
+ * Configuración visual del Liceo.
+ * La identidad es propia del template (dorado/tinta); una configuración
+ * explícita de la institución sobrescribe los defaults cuando corresponde.
+ */
+function liceoConfig(config) {
+  const raw = config?.config || {};
+  const parseHex = (value, fallback) => {
+    if (typeof value === 'string' && /^#?([0-9a-f]{6})$/i.test(value)) {
+      return value.replace('#', '').toUpperCase();
+    }
+    return fallback;
+  };
+  return {
+    primary: parseHex(raw.primaryColor, LICEO_DEFAULTS.primary),
+    secondary: parseHex(raw.secondaryColor, LICEO_DEFAULTS.secondary),
+    showLogo: raw.showLogo !== false,
+    showAttendance: raw.showAttendance !== false,
+    showEvaluations: raw.showEvaluations !== false,
+    showTeacher: raw.showTeacher !== false,
+  };
+}
+
 export function renderLiceoBoletin(data, config, ctx = {}) {
-  const opts = mergeConfig(config);
+  const opts = liceoConfig(config);
   const es = escapeLaTeX;
 
   const student = data.student || {};
@@ -245,7 +286,7 @@ ${legendItems}}
 \\centering
 {\\scriptsize\\color{TextGray}Promedio general}\\par
 \\vspace{1pt}
-{\\headingfont\\bfseries\\Large\\textcolor{Ink}{${promTex}}}
+{\\headingfont\\bfseries\\Large\\textcolor{Gold}{${promTex}}}
 &
 \\centering
 {\\scriptsize\\color{TextGray}Estado general}\\par
@@ -253,7 +294,7 @@ ${legendItems}}
 ${resumenChip(summary.estadoGlobal)}
 \\end{tabularx}
 \\vspace{0.08cm}
-\\noindent\\color{BorderGray}\\rule{\\linewidth}{0.4pt}
+\\noindent\\color{Gold}\\rule{\\linewidth}{0.6pt}
 \\vspace{0.05cm}
 \\begin{tabularx}{\\linewidth}{X X}
 \\centering
@@ -315,9 +356,9 @@ ${attRows.map(([l, v]) => `{\\scriptsize ${es(l)}} & {\\bfseries ${v}}`).join(' 
     .map((b) => `\\textcolor{${bandColor(b.letra)}}{\\bfseries ${es(b.letra)}} = ${es(b.nombre)} (${bandRange(b)})`)
     .join('\\quad\n');
   const escalaStrip = `\\noindent
-\\fcolorbox{BorderGray}{LightGold}{\\parbox{\\dimexpr\\textwidth-2\\fboxrule-2\\fboxsep\\relax}{
+\\fcolorbox{Gold}{LightGold}{\\parbox{\\dimexpr\\textwidth-2\\fboxrule-2\\fboxsep\\relax}{
 \\centering
-{\\headingfont\\bfseries\\scriptsize\\textcolor{ink}{ESCALA DE EVALUACIÓN INSTITUCIONAL}}\\par
+{\\headingfont\\bfseries\\scriptsize\\textcolor{Ink}{ESCALA DE EVALUACIÓN INSTITUCIONAL}}\\par
 \\vspace{0.03cm}
 {\\scriptsize
 \\textbf{Escala máxima:} ${fmt(summary.escalaMaxima)}
@@ -332,8 +373,8 @@ ${bandsLine}
   if (firmas.length > 0) {
     const firmaCell = (cargo) =>
       `\\parbox{6.2cm}{\\vspace{0.6cm}\\centering
-\\rule{5.9cm}{0.6pt}\\\\[0.12cm]
-{\\scriptsize\\bfseries ${es(cargo)}}}`;
+\\rule{5.9cm}{0.8pt}\\\\[0.12cm]
+{\\scriptsize\\bfseries\\textcolor{Ink}{${es(cargo)}}}`;
     if (firmas.length === 1) {
       firmasTex = `\\noindent\\centering
 ${firmaCell(firmas[0])}`;
@@ -348,8 +389,8 @@ ${firmaCell(firmas[0])}`;
 
   const logoCell =
     ctx.hasLogo && opts.showLogo
-      ? '\\includegraphics[width=2.25cm,height=2.25cm,keepaspectratio]{logo.png}'
-      : '\\rule{0pt}{2.25cm}';
+      ? '\\includegraphics[width=2.1cm,height=2.1cm,keepaspectratio]{logo.png}'
+      : '\\rule{0pt}{2.1cm}';
 
   const centerCell = `{\\headingfont\\bfseries\\Large\\textcolor{Ink}{${es(String(institution.nombre || '').toUpperCase())}}}\\par
 ${lema ? `{\\scriptsize\\color{TextGray}${es(lema)}}\\par` : ''}
@@ -357,13 +398,13 @@ ${lema ? `{\\scriptsize\\color{TextGray}${es(lema)}}\\par` : ''}
 {\\headingfont\\bfseries\\large\\textcolor{Gold}{INFORME ACADÉMICO Y CONVIVENCIAL}}\\par`;
 
   const headerTex = `\\noindent
-\\begin{tabularx}{\\textwidth}{>{\\centering\\arraybackslash}p{2.65cm}>{\\centering\\arraybackslash}X}
+\\begin{tabularx}{\\textwidth}{>{\\centering\\arraybackslash}p{2.45cm}>{\\centering\\arraybackslash}X}
 ${logoCell} & ${centerCell} \\\\
 \\end{tabularx}
 \\vspace{0.08cm}
-\\noindent\\textcolor{Ink}{\\rule{\\textwidth}{1.2pt}}
+\\noindent\\textcolor{Gold}{\\rule{\\textwidth}{1.4pt}}
 \\vspace{0.02cm}
-\\noindent\\textcolor{Gold}{\\rule{\\textwidth}{1.8pt}}
+\\noindent\\textcolor{Ink}{\\rule{\\textwidth}{1.8pt}}
 \\vspace{0.12cm}`;
 
   const cardsTopTex = `\\noindent
@@ -375,7 +416,7 @@ ${logoCell} & ${centerCell} \\\\
 
   const tex = `\\documentclass[10pt,a4paper]{article}
 
-\\usepackage[top=0.85cm,bottom=0.9cm,left=1.0cm,right=1.0cm]{geometry}
+\\usepackage[top=1.0cm,bottom=0.95cm,left=1.0cm,right=1.0cm]{geometry}
 \\usepackage{fontspec}
 \\setmainfont{DejaVu Serif}
 \\newfontfamily\\headingfont{DejaVu Sans}
@@ -389,10 +430,10 @@ ${logoCell} & ${centerCell} \\\\
 
 \\definecolor{Ink}{HTML}{${opts.primary}}
 \\definecolor{Gold}{HTML}{${opts.secondary}}
-\\definecolor{LightGold}{HTML}{${configText(config, 'lightGoldColor') || 'FAF3E3'}}
-\\definecolor{BorderGray}{HTML}{C9D2DC}
-\\definecolor{TextGray}{HTML}{4B5563}
-\\definecolor{ink}{HTML}{1F2937}
+\\definecolor{LightGold}{HTML}{${configText(config, 'lightGoldColor') || 'F6EFE0'}}
+\\definecolor{BorderGray}{HTML}{B8A26A}
+\\definecolor{TextGray}{HTML}{6B5F45}
+\\definecolor{ink}{HTML}{303030}
 \\definecolor{Success}{HTML}{198754}
 \\definecolor{SuccessLight}{HTML}{EAF6EE}
 \\definecolor{Danger}{HTML}{C62828}
@@ -406,9 +447,9 @@ ${logoCell} & ${centerCell} \\\\
 \\setlength{\\parskip}{0pt}
 \\setlength{\\tabcolsep}{3pt}
 \\setlength{\\fboxsep}{3pt}
-\\setlength{\\fboxrule}{0.4pt}
+\\setlength{\\fboxrule}{0.5pt}
 \\setlength{\\arrayrulewidth}{0.5pt}
-\\setlength{\\footskip}{0.55cm}
+\\setlength{\\footskip}{0.6cm}
 
 \\newcommand{\\sectiontitle}[1]{%
   \\vspace{0.04cm}%
@@ -418,7 +459,7 @@ ${logoCell} & ${centerCell} \\\\
 }
 
 \\newcommand{\\card}[1]{%
-  \\fcolorbox{BorderGray}{white}{%
+  \\fcolorbox{Gold}{white}{%
     \\parbox{\\dimexpr\\linewidth-2\\fboxrule-2\\fboxsep\\relax}{#1}}}
 
 \\newcommand{\\labelvalue}[2]{%
@@ -437,6 +478,11 @@ ${logoCell} & ${centerCell} \\\\
 \\hfill Página \\thepage\\ de \\pageref{LastPage}\\hspace*{0.4cm}}}}}
 
 \\begin{document}
+
+% ============ Franja superior institucional (tinta) ============
+\\noindent\\colorbox{Ink}{\\parbox{\\dimexpr\\textwidth-2\\fboxsep\\relax}{%
+\\centering\\color{white}\\headingfont\\bfseries\\large ${es(String(institution.nombre || '').toUpperCase())}${lema ? `\\quad\\normalsize\\textcolor{LightGold}{${es(lema)}}` : ''}}}%
+\\vspace{0.25cm}
 
 % ============ Encabezado ============
 ${headerTex}

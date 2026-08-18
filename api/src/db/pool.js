@@ -11,12 +11,15 @@ const url = new URL(config.databaseUrl);
 const isLocal =
   url.hostname === 'localhost' ||
   url.hostname === '127.0.0.1' ||
-  url.hostname === '::1';
+  url.hostname === '::1' ||
+  url.hostname === 'db';
+
+const sslMode = url.searchParams.get('sslmode');
 
 const pool = new Pool({
   connectionString: config.databaseUrl,
   max: 10,
-  ...(isLocal ? {} : { ssl: { rejectUnauthorized: false } }),
+  ...(sslMode === 'disable' || isLocal ? {} : { ssl: { rejectUnauthorized: false } }),
 });
 
 pool.on('error', (err) => {

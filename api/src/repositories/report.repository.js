@@ -124,7 +124,7 @@ export async function upsertReportTemplate(institucionId, template, tipoDocument
   const { rows } = await pool.query(
     `INSERT INTO institution_report_configs
        (id, institucion_id, tipo_documento, config, version, activo, created_at, updated_at)
-     VALUES ($1, $2, $3, jsonb_build_object('template', $4), 1, true, $5, $5)
+     VALUES ($1, $2, $3, jsonb_build_object('template', $4::text), 1, true, $5, $5)
      ON CONFLICT ("institucion_id", "tipo_documento")
      DO UPDATE SET
        config = institution_report_configs.config || jsonb_build_object('template', EXCLUDED.config->'template'),

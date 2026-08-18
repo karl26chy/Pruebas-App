@@ -326,4 +326,89 @@ export default async function pdfSuite() {
     const tex = render(sampleData({ config: baseConfig }));
     contains(tex, '\\bfseries \\#', 'celda de numeral escapada');
   });
+
+  // ---- Plantilla institucional "liceo_alegre_juventud" ----------------------
+
+  /** Renderiza la plantilla Liceo con los datos indicados. */
+  function renderLiceo(overrides = {}) {
+    const data = sampleData(overrides);
+    data.institution.reportConfig = overrides.config ?? {
+      template: 'liceo_alegre_juventud',
+      logo_url: '/logo_liceo_alegre_juventud.png',
+      config: {
+        showLogo: true,
+        showAttendance: true,
+        showEvaluations: true,
+        showTeacher: true,
+      },
+    };
+    return renderTeX(data, data.institution.reportConfig, { hasLogo: true });
+  }
+
+  await test('liceo_alegre_juventud selecciona el renderer Liceo (no cae en default)', () => {
+    const t = getTemplate('liceo_alegre_juventud');
+    ok(t === getTemplate('liceo_alegre_juventud') && t.name !== undefined, 'resuelve el template registrado');
+    // El output del Liceo usa su identidad (Ink/Gold) y NO la del default (Navy/LightNavy).
+    const tex = renderLiceo();
+    contains(tex, '\\definecolor{Ink}', 'usa el color principal del Liceo');
+    notOk(tex.includes('\\definecolor{Navy}'), 'no usa el color principal del default');
+    notOk(tex.includes('\\definecolor{LightNavy}'), 'no usa la zebra del default');
+  });
+
+  await test('liceo_alegre_juventud tiene defaults de color propios sin config de colores', () => {
+    // Sin primaryColor/secondaryColor en el config: la identidad es del template.
+    const tex = renderLiceo();
+    contains(tex, '\\definecolor{Ink}{HTML}{887030}', 'primary default dorado del Liceo');
+    contains(tex, '\\definecolor{Gold}{HTML}{303030}', 'secondary default tinta del Liceo');
+  });
+
+  await test('liceo_alegre_juventud es estructuralmente distinto de default (anti-clon)', () => {
+    const liceo = renderLiceo();
+    const def = render(sampleData({ config: baseConfig }));
+    // El Liceo tiene elementos estructurales que el default NO tiene.
+    contains(liceo, 'Franja superior institucional', 'franja superior presente');
+    notOk(def.includes('Franja superior institucional'), 'el default no tiene franja superior');
+    // Borde de tarjetas: el Liceo usa dorado, el default usa BorderGray.
+    contains(liceo, '\\fcolorbox{Gold}{white}', 'tarjetas con borde dorado');
+    notOk(liceo.includes('\\fcolorbox{BorderGray}{white}'), 'las tarjetas del Liceo no usan borde gris');
+    // Ambos documentos difieren en contenido.
+    ok(liceo !== def, 'los .tex de ambos templates son diferentes');
+  });
+
+  await test('liceo_alegre_juventud expone sus marcadores visuales distintivos', () => {
+    const tex = renderLiceo();
+    contains(tex, '\\textcolor{Gold}{INFORME ACADÉMICO Y CONVIVENCIAL}', 'título institucional en dorado');
+    contains(tex, 'LightGold', 'zebra dorada de la tabla');
+    contains(tex, '\\sectiontitle{DESEMPEÑO ACADÉMICO}', 'sección desempeño');
+    contains(tex, '\\sectiontitle{INFORMACIÓN DEL ESTUDIANTE}', 'tarjeta estudiante');
+    contains(tex, 'ESCALA DE EVALUACIÓN INSTITUCIONAL', 'franja de escala');
+    contains(tex, 'Página \\thepage\\ de \\pageref{LastPage}', 'numeración de página');
+  });
+
+  await test('liceo_alegre_juventud: una config explícita de colores sobrescribe los defaults', () => {
+    const tex = renderLiceo({
+      config: {
+        template: 'liceo_alegre_juventud',
+        logo_url: '/logo_liceo_alegre_juventud.png',
+        config: {
+          showLogo: true, showAttendance: true, showEvaluations: true, showTeacher: true,
+          primaryColor: '#123456', secondaryColor: '#ABCDEF',
+        },
+      },
+    });
+    contains(tex, '\\definecolor{Ink}{HTML}{123456}', 'primary sobrescrito por config');
+    contains(tex, '\\definecolor{Gold}{HTML}{ABCDEF}', 'secondary sobrescrito por config');
+    notOk(tex.includes('\\definecolor{Ink}{HTML}{887030}'), 'ya no usa el default dorado');
+  });
+
+  await test('liceo_alegre_juventud comparte la misma maquinaria de datos que default', () => {
+    const liceo = renderLiceo();
+    // Mismos datos académicos (estudiante, materias, resumen, asistencia, escala).
+    contains(liceo, 'Juan Fernández', 'estudiante');
+    contains(liceo, 'Matemáticas', 'materia');
+    contains(liceo, '\\labelvalue{Grado}', 'grado en tarjeta');
+    contains(liceo, '\\labelvalue{Período}', 'período en tarjeta');
+    contains(liceo, '\\textbf{Escala máxima:}', 'escala dinámica');
+    contains(liceo, '\\textbf{Mínima aprobación:}', 'mínima dinámica');
+  });
 }
