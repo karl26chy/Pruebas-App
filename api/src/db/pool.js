@@ -1,5 +1,8 @@
 import pg from 'pg';
+import dns from 'node:dns';
 import config from '../config/index.js';
+
+dns.setDefaultResultOrder('ipv4first');
 
 const { Pool, types } = pg;
 
