@@ -51,13 +51,15 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
             No hay datos de rendimiento aún.
           </EmptyMessage>
         ) : (
-          <SubjectPerformanceChart
-            data={subjectData}
-            dataKey="Promedio"
-            maxScore={maxScoreFor(institution)}
-            notaMinima={institution?.nota_minima_aprobacion}
-            referenceLabel={`Mín (${institution?.nota_minima_aprobacion})`}
-          />
+          <div style={{ width: '100%', minHeight: 260 }}>
+            <SubjectPerformanceChart
+              data={subjectData}
+              dataKey="Promedio"
+              maxScore={maxScoreFor(institution)}
+              notaMinima={institution?.nota_minima_aprobacion}
+              referenceLabel={`Mín (${institution?.nota_minima_aprobacion})`}
+            />
+          </div>
         )}
       </Card>
 
