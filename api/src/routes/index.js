@@ -2,6 +2,8 @@ import express from 'express';
 import authRoutes from './auth.routes.js';
 import academicHistoryRoutes from './academic-history.routes.js';
 import reportRoutes from './report.routes.js';
+import reportConfigRoutes from './report-config.routes.js';
+import reportTemplatesRoutes from './report-templates.routes.js';
 import resourceRoutes from './resource.routes.js';
 
 const router = express.Router();
@@ -15,6 +17,8 @@ router.use('/auth', authRoutes);
 // /students/:studentId/academic-history no caiga en el 404 de recursos.
 router.use('/', academicHistoryRoutes);
 router.use('/', reportRoutes);
+router.use('/', reportConfigRoutes);
+router.use('/', reportTemplatesRoutes);
 router.use('/', resourceRoutes);
 
 export default router;

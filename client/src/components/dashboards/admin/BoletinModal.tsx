@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { FileSpreadsheet, Loader2, ShieldAlert } from 'lucide-react';
+import { FileSpreadsheet, FileText, Loader2, ShieldAlert } from 'lucide-react';
 import { api } from '../../../services/api';
+import { API_BASE, getAuthToken } from '../../../services/http';
 import { useApp } from '../../../context/useApp';
 import { fullName } from '../../../lib/people';
 import { gradeLabel } from '../../../lib/people';
@@ -23,7 +24,7 @@ export const BoletinModal: React.FC<BoletinModalProps> = ({ student, onClose }) 
   const [periods, setPeriods] = useState<AcademicPeriod[]>([]);
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
   const [selection, setSelection] = useState<Selection | null>(null);
-  const [busy, setBusy] = useState<'excel' | null>(null);
+  const [busy, setBusy] = useState<'pdf' | 'excel' | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const instId = user?.institucion_id;
@@ -91,6 +92,52 @@ export const BoletinModal: React.FC<BoletinModalProps> = ({ student, onClose }) 
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo generar el boletín.');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const descargarPDF = async () => {
+    if (!selection || selection.mode !== 'period') return setError('Selecciona un período para el PDF.');
+    setBusy('pdf');
+    setError(null);
+    try {
+      const url = `${API_BASE}/students/${encodeURIComponent(student.id)}/report/pdf?period_id=${encodeURIComponent(selection.periodId)}`;
+      const token = getAuthToken();
+      let response: Response;
+      try {
+        response = await fetch(url, {
+          headers: { Authorization: token ? `Bearer ${token}` : '' },
+          cache: 'no-store',
+        });
+      } catch {
+        throw new Error('No se pudo conectar con el servidor API.');
+      }
+      if (!response.ok) {
+        let msg = `API error: ${response.status}`;
+        try {
+          const data = await response.json();
+          if (data?.error) msg = String(data.error);
+        } catch {}
+        throw new Error(msg);
+      }
+      const blob = await response.blob();
+      const disposition = response.headers.get('Content-Disposition');
+      let filename = `boletin_${selection.periodId}.pdf`;
+      if (disposition) {
+        const m = /filename\*=(?:UTF-8''|")([^";]+)"/i.exec(disposition) || /filename=([^;]+)/i.exec(disposition);
+        if (m) filename = m[1].replace(/^"|"$/g, '');
+      }
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo generar el PDF.');
     } finally {
       setBusy(null);
     }
@@ -189,6 +236,16 @@ export const BoletinModal: React.FC<BoletinModalProps> = ({ student, onClose }) 
           className="px-4 py-2.5 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors text-sm w-full sm:w-auto"
         >
           Cancelar
+        </button>
+        <button
+          type="button"
+          disabled={!selection || busy !== null || selection.mode === 'all'}
+          title={selection?.mode === 'all' ? 'PDF solo por período' : undefined}
+          onClick={() => descargarPDF()}
+          className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-q10-600 hover:bg-q10-700 text-white font-semibold text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
+        >
+          {busy === 'pdf' ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
+          Descargar PDF
         </button>
         <button
           type="button"

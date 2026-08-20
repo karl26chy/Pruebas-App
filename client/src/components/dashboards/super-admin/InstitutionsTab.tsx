@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Edit3, Plus, ToggleLeft, ToggleRight, Trash2 } from 'lucide-react';
 import { api } from '../../../services/api';
+import { http } from '../../../services/http';
 import { Card, CardTitle, INPUT_LARGE, Modal, TableWrapper, TableHead, TableBody } from '../../ui';
 import { DeleteInstitutionModal } from './DeleteInstitutionModal';
 import { scaleLabel } from '../../../lib/grades';
@@ -37,7 +38,23 @@ export const InstitutionsTab: React.FC<InstitutionsTabProps> = ({
   const [tipo, setTipo] = useState<Tipo>('colegio');
   const [escala, setEscala] = useState(10);
   const [notaMinima, setNotaMinima] = useState(6.0);
+  const [reportTemplateId, setReportTemplateId] = useState('default');
+  const [reportActivo, setReportActivo] = useState(true);
+  const [templates, setTemplates] = useState<{ id: string; name: string }[]>([{ id: 'default', name: 'Formato por defecto' }]);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await http.get<{ id: string; name: string }[]>('/report-templates');
+        if (!cancelled && Array.isArray(data) && data.length > 0) setTemplates(data);
+      } catch {
+        // fallback default ya está
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
   const [deleting, setDeleting] = useState<Institution | null>(null);
   const [editing, setEditing] = useState<Institution | null>(null);
 
@@ -64,18 +81,33 @@ export const InstitutionsTab: React.FC<InstitutionsTabProps> = ({
 
     try {
       setLoading(true);
-      await api.createInstitution({
+      const newInst = (await api.createInstitution({
         nombre,
         subdominio: subdominio.toLowerCase().replace(/[^a-z0-9]/g, ''),
         tipo,
         escala_maxima: escala,
         nota_minima_aprobacion: clampNotaMinima(Number(notaMinima), escala),
         activa: true,
-      });
+      })) as unknown as Institution;
+
+      // Formato de boletín: selector versionado
+      try {
+        await http.post(`/institutions/${newInst.id}/report-config`, {
+          tipo_documento: 'boletin',
+          template_id: reportTemplateId,
+          logo_url: null,
+          activo: reportActivo,
+        });
+      } catch (err) {
+        showMsg('error', err instanceof Error ? err.message : 'Institución creada pero no se pudo guardar el formato de boletín.');
+      }
+
       setNombre('');
       setSubdominio('');
       setEscala(10);
       setNotaMinima(6.0);
+      setReportTemplateId('default');
+      setReportActivo(true);
       showMsg('success', 'Institución creada.');
       await onChanged();
     } catch {
@@ -196,6 +228,24 @@ export const InstitutionsTab: React.FC<InstitutionsTabProps> = ({
             </p>
           </div>
 
+          <div className="border-t border-gray-200 pt-4 mt-4">
+            <h4 className="text-sm font-semibold text-gray-900 mb-3">Formato de boletín</h4>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Plantilla</label>
+                <select value={reportTemplateId} onChange={e => setReportTemplateId(e.target.value)} className={INPUT_LARGE}>
+                  {templates.map(t => (
+                    <option key={t.id} value={t.id}>{t.name}</option>
+                  ))}
+                </select>
+              </div>
+              <label className="flex items-center gap-2 text-sm text-gray-700">
+                <input type="checkbox" checked={reportActivo} onChange={e => setReportActivo(e.target.checked)} className="rounded border-gray-300 text-q10-600 focus:ring-q10-500" />
+                Activo
+              </label>
+            </div>
+          </div>
+
           <button
             type="submit" disabled={loading}
             className="w-full py-3 bg-q10-600 hover:bg-q10-700 text-white font-semibold rounded-xl transition-colors mt-2"
@@ -293,7 +343,7 @@ export const InstitutionsTab: React.FC<InstitutionsTabProps> = ({
   );
 };
 
-/** Modal de edición de una institución (config de escala y nota mínima). */
+/** Modal de edición de una institución (config de escala, nota mínima y formato de boletín). */
 const EditInstitutionModal: React.FC<{
   institution: Institution;
   busy: boolean;
@@ -304,15 +354,55 @@ const EditInstitutionModal: React.FC<{
   const [tipo, setTipo] = useState<Tipo>(institution.tipo || 'colegio');
   const [escala, setEscala] = useState(institution.escala_maxima || 10);
   const [notaMinima, setNotaMinima] = useState(Number(institution.nota_minima_aprobacion));
+  const [reportTemplateId, setReportTemplateId] = useState('default');
+  const [reportActivo, setReportActivo] = useState(true);
+  const [reportLoading, setReportLoading] = useState(false);
+  const [templates, setTemplates] = useState<{ id: string; name: string }[]>([{ id: 'default', name: 'Formato por defecto' }]);
 
   const changeEscala = (next: number) => {
     setEscala(next);
     setNotaMinima(prev => (prev < 1 || prev > next ? defaultNotaMinima(next) : prev));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await http.get<{ id: string; name: string }[]>('/report-templates');
+        if (!cancelled && Array.isArray(data) && data.length > 0) setTemplates(data);
+      } catch {}
+      try {
+        const cfg = await http.get<{
+          config?: { template_id?: string };
+          activo?: boolean;
+        }>(`/institutions/${institution.id}/report-config?tipo_documento=boletin`);
+        if (!cancelled && cfg?.config?.template_id) {
+          setReportTemplateId(cfg.config.template_id);
+        }
+        if (!cancelled && typeof cfg?.activo === 'boolean') setReportActivo(cfg.activo);
+      } catch {
+        // sin config previa
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [institution.id]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     onSubmit({ nombre: nombre.trim(), tipo, escala_maxima: escala, nota_minima_aprobacion: notaMinima });
+    setReportLoading(true);
+    try {
+      await http.post(`/institutions/${institution.id}/report-config`, {
+        tipo_documento: 'boletin',
+        template_id: reportTemplateId,
+        logo_url: null,
+        activo: reportActivo,
+      });
+    } catch {
+      // el error de formato no bloquea la actualización de la institución
+    } finally {
+      setReportLoading(false);
+    }
   };
 
   return (
@@ -350,9 +440,26 @@ const EditInstitutionModal: React.FC<{
             className={INPUT_LARGE}
           />
         </div>
+        <div className="border-t border-gray-200 pt-4 mt-4">
+          <h4 className="text-sm font-semibold text-gray-900 mb-3">Formato de boletín</h4>
+          <div className="space-y-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Plantilla</label>
+              <select value={reportTemplateId} onChange={e => setReportTemplateId(e.target.value)} className={INPUT_LARGE}>
+                {templates.map(t => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </select>
+            </div>
+            <label className="flex items-center gap-2 text-sm text-gray-700">
+              <input type="checkbox" checked={reportActivo} onChange={e => setReportActivo(e.target.checked)} className="rounded border-gray-300 text-q10-600 focus:ring-q10-500" />
+              Activo
+            </label>
+          </div>
+        </div>
         <div className="flex gap-2 pt-1">
-          <button type="submit" disabled={busy} className={`flex-1 py-3 bg-q10-600 hover:bg-q10-700 text-white font-semibold rounded-xl transition-colors disabled:opacity-60`}>
-            {busy ? 'Guardando...' : 'Guardar Cambios'}
+          <button type="submit" disabled={busy || reportLoading} className={`flex-1 py-3 bg-q10-600 hover:bg-q10-700 text-white font-semibold rounded-xl transition-colors disabled:opacity-60`}>
+            {busy || reportLoading ? 'Guardando...' : 'Guardar Cambios'}
           </button>
           <button type="button" onClick={onCancel} className="px-4 py-2.5 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors">
             Cancelar
