@@ -1,11 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Edit3, Plus, ToggleLeft, ToggleRight, Trash2 } from 'lucide-react';
 import { api } from '../../../services/api';
 import { Card, CardTitle, INPUT_LARGE, Modal, TableWrapper, TableHead, TableBody } from '../../ui';
 import { DeleteInstitutionModal } from './DeleteInstitutionModal';
 import { scaleLabel } from '../../../lib/grades';
-import { REPORT_TEMPLATE_FALLBACK } from '../../../lib/reports/template-metadata';
-import type { Institution, ReportTemplateInfo } from '../../../types';
+import type { Institution } from '../../../types';
 import type { Feedback } from './useSuperAdmin';
 
 interface InstitutionsTabProps {
@@ -38,18 +37,9 @@ export const InstitutionsTab: React.FC<InstitutionsTabProps> = ({
   const [tipo, setTipo] = useState<Tipo>('colegio');
   const [escala, setEscala] = useState(10);
   const [notaMinima, setNotaMinima] = useState(6.0);
-  const [boletinTemplate, setBoletinTemplate] = useState('default');
-  const [templates, setTemplates] = useState<ReportTemplateInfo[]>(REPORT_TEMPLATE_FALLBACK);
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState<Institution | null>(null);
   const [editing, setEditing] = useState<Institution | null>(null);
-
-  // Carga el catálogo de formatos disponibles (fallback local si falla).
-  useEffect(() => {
-    api.getReportTemplates()
-      .then(setTemplates)
-      .catch(() => setTemplates(REPORT_TEMPLATE_FALLBACK));
-  }, []);
 
   // Al cambiar la escala se revalida la nota mínima: si se sale de la nueva
   // escala se ajusta al 60% (valor inicial editable); si no, se conserva.
@@ -81,13 +71,11 @@ export const InstitutionsTab: React.FC<InstitutionsTabProps> = ({
         escala_maxima: escala,
         nota_minima_aprobacion: clampNotaMinima(Number(notaMinima), escala),
         activa: true,
-        boletin_template: boletinTemplate,
       });
       setNombre('');
       setSubdominio('');
       setEscala(10);
       setNotaMinima(6.0);
-      setBoletinTemplate('default');
       showMsg('success', 'Institución creada.');
       await onChanged();
     } catch {
@@ -120,7 +108,7 @@ export const InstitutionsTab: React.FC<InstitutionsTabProps> = ({
     }
   };
 
-  const handleEditSubmit = async (data: { nombre: string; tipo: Tipo; escala_maxima: number; nota_minima_aprobacion: number; boletin_template: string }) => {
+  const handleEditSubmit = async (data: { nombre: string; tipo: Tipo; escala_maxima: number; nota_minima_aprobacion: number }) => {
     if (!editing) return;
     try {
       setLoading(true);
@@ -208,22 +196,6 @@ export const InstitutionsTab: React.FC<InstitutionsTabProps> = ({
             </p>
           </div>
 
-          <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Formato de boletín</label>
-            <select
-              value={boletinTemplate}
-              onChange={e => setBoletinTemplate(e.target.value)}
-              className={INPUT_LARGE}
-            >
-              {templates.map(t => (
-                <option key={t.id} value={t.id}>{t.name}</option>
-              ))}
-            </select>
-            <p className="text-[11px] text-gray-400 mt-1">
-              Formato usado al generar los boletines de esta institución.
-            </p>
-          </div>
-
           <button
             type="submit" disabled={loading}
             className="w-full py-3 bg-q10-600 hover:bg-q10-700 text-white font-semibold rounded-xl transition-colors mt-2"
@@ -304,7 +276,6 @@ export const InstitutionsTab: React.FC<InstitutionsTabProps> = ({
       {editing && (
         <EditInstitutionModal
           institution={editing}
-          templates={templates}
           busy={loading}
           onCancel={() => setEditing(null)}
           onSubmit={handleEditSubmit}
@@ -322,19 +293,17 @@ export const InstitutionsTab: React.FC<InstitutionsTabProps> = ({
   );
 };
 
-/** Modal de edición de una institución (config de escala, nota mínima y formato). */
+/** Modal de edición de una institución (config de escala y nota mínima). */
 const EditInstitutionModal: React.FC<{
   institution: Institution;
-  templates: ReportTemplateInfo[];
   busy: boolean;
   onCancel: () => void;
-  onSubmit: (data: { nombre: string; tipo: Tipo; escala_maxima: number; nota_minima_aprobacion: number; boletin_template: string }) => void;
-}> = ({ institution, templates, busy, onCancel, onSubmit }) => {
+  onSubmit: (data: { nombre: string; tipo: Tipo; escala_maxima: number; nota_minima_aprobacion: number }) => void;
+}> = ({ institution, busy, onCancel, onSubmit }) => {
   const [nombre, setNombre] = useState(institution.nombre);
   const [tipo, setTipo] = useState<Tipo>(institution.tipo || 'colegio');
   const [escala, setEscala] = useState(institution.escala_maxima || 10);
   const [notaMinima, setNotaMinima] = useState(Number(institution.nota_minima_aprobacion));
-  const [boletinTemplate, setBoletinTemplate] = useState(institution.boletin_template || 'default');
 
   const changeEscala = (next: number) => {
     setEscala(next);
@@ -343,7 +312,7 @@ const EditInstitutionModal: React.FC<{
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit({ nombre: nombre.trim(), tipo, escala_maxima: escala, nota_minima_aprobacion: notaMinima, boletin_template: boletinTemplate });
+    onSubmit({ nombre: nombre.trim(), tipo, escala_maxima: escala, nota_minima_aprobacion: notaMinima });
   };
 
   return (
@@ -380,15 +349,6 @@ const EditInstitutionModal: React.FC<{
             value={notaMinima} onChange={e => setNotaMinima(Number(e.target.value))}
             className={INPUT_LARGE}
           />
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">Formato de boletín</label>
-          <select value={boletinTemplate} onChange={e => setBoletinTemplate(e.target.value)} className={INPUT_LARGE}>
-            {templates.map(t => (
-              <option key={t.id} value={t.id}>{t.name}</option>
-            ))}
-          </select>
-          <p className="text-[11px] text-gray-400 mt-1">Formato usado al generar los boletines de esta institución.</p>
         </div>
         <div className="flex gap-2 pt-1">
           <button type="submit" disabled={busy} className={`flex-1 py-3 bg-q10-600 hover:bg-q10-700 text-white font-semibold rounded-xl transition-colors disabled:opacity-60`}>

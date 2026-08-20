@@ -1,15 +1,10 @@
 import type { AcademicYearReportData, ReportConfig } from './types';
 
 /**
- * Contrato de una plantilla de boletín: cada institución puede aportar la
- * suya (renderPDF + renderExcel) sin tocar el motor. El contenido académico
- * SIEMPRE viene de AcademicYearReportData (materias y períodos dinámicos).
+ * Helpers compartidos para el reporte académico.
+ * El contenido académico SIEMPRE viene de AcademicYearReportData.
+ * El sistema de plantillas PDF fue eliminado — solo quedan helpers para Excel.
  */
-export interface ReportTemplate {
-  name: string;
-  renderPDF: (data: AcademicYearReportData, config: ReportConfig | null) => void | Promise<void>;
-  renderExcel: (data: AcademicYearReportData, config: ReportConfig | null) => void | Promise<void>;
-}
 
 /** Defaults razonables que el JSON de configuración puede sobrescribir. */
 export function mergeConfig(config: ReportConfig | null): {

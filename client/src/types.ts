@@ -14,8 +14,6 @@ export interface Institution {
   escala_maxima: number;
   nota_minima_aprobacion: number;
   activa: boolean;
-  /** Formato de boletín asignado (solo lectura; vive en institution_report_configs). */
-  boletin_template?: string;
 }
 
 export interface User {
@@ -184,11 +182,4 @@ export interface AcademicHistory {
   years: AcademicHistoryYear[];
 }
 
-/** Formato de boletín disponible (catálogo que expone el backend). */
-export interface ReportTemplateInfo {
-  id: string;
-  name: string;
-  description: string;
-  pdf: boolean;
-  excel: boolean;
-}
+

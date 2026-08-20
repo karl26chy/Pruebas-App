@@ -1,7 +1,6 @@
 import { HttpError } from '../shared/http-error.js';
 import { periodById, findRaw } from '../repositories/resource.repository.js';
 import * as repo from '../repositories/report.repository.js';
-import { templateCatalog } from './pdf/latex/templates/registry.js';
 
 /**
  * Reporte académico.
@@ -84,7 +83,6 @@ function buildInstitutionBlock(institution, config) {
     nota_minima_aprobacion: notaMinimaDe(institution, escalaDe(institution)),
     reportConfig: config
       ? {
-          template: (config.config && config.config.template) || 'default',
           logo_url: config.logo_url || null,
           config: config.config || {},
         }
@@ -335,11 +333,4 @@ export async function getYearReport(user, studentId, anio) {
   };
 }
 
-/**
- * Catálogo de formatos de boletín disponibles. Solo expone metadatos (id,
- * nombre, descripción, disponibilidad de PDF/Excel); nunca el contenido ni el
- * código de las plantillas. Único punto que alimenta la gestión en Super Admin.
- */
-export function listReportTemplates() {
-  return templateCatalog();
-}
+

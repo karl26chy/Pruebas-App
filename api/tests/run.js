@@ -19,7 +19,6 @@ import attendanceSuite from './suites/attendance.js';
 import subjectsSuite from './suites/subjects.js';
 import studentsSuite from './suites/students.js';
 import reportsSuite from './suites/reports.js';
-import pdfSuite from './suites/pdf.js';
 import evaluationsSuite from './suites/evaluations.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -121,7 +120,6 @@ async function main() {
     await subjectsSuite(world);
     await studentsSuite(world);
     await reportsSuite(world);
-    await pdfSuite(world);
     await evaluationsSuite(world);
 
     exitCode = report();

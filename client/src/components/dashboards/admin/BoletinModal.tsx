@@ -1,12 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { FileSpreadsheet, FileText, Loader2, ShieldAlert } from 'lucide-react';
+import { FileSpreadsheet, Loader2, ShieldAlert } from 'lucide-react';
 import { api } from '../../../services/api';
 import { useApp } from '../../../context/useApp';
 import { fullName } from '../../../lib/people';
 import { gradeLabel } from '../../../lib/people';
 import { boletinChoices, periodLabel, periodsOfYear, yearsOf } from '../../../lib/periods';
 import { renderBoletinPeriodExcel } from '../../../lib/reports/renderers/period-excel';
-import { getTemplate, resolveConfig } from '../../../lib/reports/registry';
+import { renderBoletinExcel } from '../../../lib/reports/renderers/excel';
 import { Modal, Field, INPUT } from '../../ui';
 import type { AcademicPeriod, User } from '../../../types';
 
@@ -17,15 +17,13 @@ interface BoletinModalProps {
 
 type Selection = { mode: 'period'; periodId: string } | { mode: 'all'; anio: number };
 
-/** Generación de un boletín INDIVIDUAL por período (PDF backend + Excel cliente)
- *  o ANUAL ("Todos los períodos — {año}", Excel con la plantilla registrada).
- *  El PDF anual queda pendiente de una plantilla LaTeX; no se descarga al abrir. */
+/** Generación de boletín por período o anual (solo Excel). El sistema PDF fue eliminado. */
 export const BoletinModal: React.FC<BoletinModalProps> = ({ student, onClose }) => {
   const { user, grades, studentGrades } = useApp();
   const [periods, setPeriods] = useState<AcademicPeriod[]>([]);
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
   const [selection, setSelection] = useState<Selection | null>(null);
-  const [busy, setBusy] = useState<'pdf' | 'excel' | null>(null);
+  const [busy, setBusy] = useState<'excel' | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const instId = user?.institucion_id;
@@ -78,26 +76,17 @@ export const BoletinModal: React.FC<BoletinModalProps> = ({ student, onClose }) 
   const grade = studentGrades.find(sg => sg.estudiante_id === student.id);
   const gradeNombre = grade ? gradeLabel(grades.find(g => g.id === grade.grado_id)) : 'Sin asignar';
 
-  const generar = async (format: 'pdf' | 'excel') => {
+  const generar = async () => {
     if (!selection || selectedYear === null) return setError('Selecciona un período académico.');
-    if (format === 'pdf' && selection.mode !== 'period') {
-      return setError('El PDF anual está pendiente. Usa la descarga en Excel para el reporte anual.');
-    }
-    setBusy(format);
+    setBusy('excel');
     setError(null);
     try {
       if (selection.mode === 'period') {
-        if (format === 'pdf') {
-          await api.downloadBoletinPDF(student.id, selection.periodId);
-        } else {
-          const data = await api.getStudentReport(student.id, selection.periodId);
-          renderBoletinPeriodExcel(data);
-        }
+        const data = await api.getStudentReport(student.id, selection.periodId);
+        renderBoletinPeriodExcel(data);
       } else {
-        // "Todos los períodos — año": consume el reporte anual existente.
         const data = await api.getStudentYearReport(student.id, selection.anio);
-        const template = getTemplate(data);
-        template.renderExcel(data, resolveConfig(data));
+        renderBoletinExcel(data, data.institution.reportConfig ?? null);
       }
       onClose();
     } catch (err) {
@@ -186,13 +175,6 @@ export const BoletinModal: React.FC<BoletinModalProps> = ({ student, onClose }) 
         </p>
       )}
 
-      {selection?.mode === 'all' && (
-        <p className="text-xs text-gray-400 mb-5">
-          El PDF anual está pendiente de implementación (plantilla LaTeX anual). El Excel anual usa la plantilla
-          registrada de la institución.
-        </p>
-      )}
-
       {error && (
         <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600 mb-5">
           <ShieldAlert className="h-4 w-4 mt-0.5 shrink-0" />
@@ -210,18 +192,8 @@ export const BoletinModal: React.FC<BoletinModalProps> = ({ student, onClose }) 
         </button>
         <button
           type="button"
-          disabled={!selection || busy !== null || selection.mode === 'all'}
-          title={selection?.mode === 'all' ? 'PDF anual pendiente' : undefined}
-          onClick={() => generar('pdf')}
-          className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-q10-600 hover:bg-q10-700 text-white font-semibold text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
-        >
-          {busy === 'pdf' ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
-          Descargar PDF
-        </button>
-        <button
-          type="button"
           disabled={!selection || busy !== null}
-          onClick={() => generar('excel')}
+          onClick={() => generar()}
           className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
         >
           {busy === 'excel' ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />}

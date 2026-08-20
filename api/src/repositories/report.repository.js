@@ -95,47 +95,7 @@ export async function reportConfigFor(institucionId, tipoDocumento = 'boletin') 
   return rows[0] || null;
 }
 
-/** Id del formato de boletín de una institución ('default' si no hay fila). */
-export async function reportTemplateFor(institucionId, tipoDocumento = 'boletin') {
-  const config = await reportConfigFor(institucionId, tipoDocumento);
-  return (config?.config && config.config.template) || 'default';
-}
 
-/**
- * Asigna el formato de boletín de una institución guardándolo en
- * `institution_report_configs.config.template`, PRESERVANDO el resto de
- * propiedades del `config` (colores, rectora, logo, textos…).
- *
- * · Si `template` es 'default' (o se pasa sin valor) se elimina la fila de
- *   configuración de boletín: el renderer cae al fallback estándar.
- * · Si ya existía una fila, solo se actualiza `config.template` (merge).
- * · Si no existía, se crea una fila con `config = { template }`.
- */
-export async function upsertReportTemplate(institucionId, template, tipoDocumento = 'boletin') {
-  if (!template || template === 'default') {
-    await pool.query(
-      `DELETE FROM institution_report_configs
-       WHERE "institucion_id" = $1 AND "tipo_documento" = $2`,
-      [institucionId, tipoDocumento]
-    );
-    return null;
-  }
-
-  const { rows } = await pool.query(
-    `INSERT INTO institution_report_configs
-       (id, institucion_id, tipo_documento, config, version, activo, created_at, updated_at)
-     VALUES ($1, $2, $3, jsonb_build_object('template', $4::text), 1, true, $5, $5)
-     ON CONFLICT ("institucion_id", "tipo_documento")
-     DO UPDATE SET
-       config = institution_report_configs.config || jsonb_build_object('template', EXCLUDED.config->'template'),
-       version = institution_report_configs.version + 1,
-       activo = true,
-       updated_at = EXCLUDED.updated_at
-     RETURNING *`,
-    [`rc-${institucionId}-${tipoDocumento}`, institucionId, tipoDocumento, template, new Date().toISOString()]
-  );
-  return rows[0];
-}
 
 /** Períodos de una institución para un año académico (dinámicos). */
 export async function periodsOfYear(institucionId, anio) {

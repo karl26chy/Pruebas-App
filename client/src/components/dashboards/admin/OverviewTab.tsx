@@ -1,6 +1,6 @@
 import React from 'react';
 import { AlertTriangle, Award, BarChart3, Loader2, ShieldAlert } from 'lucide-react';
-import { Card, CardTitle, EmptyMessage, ExportButtons, StatCard, TableWrapper, TableHead, TableBody } from '../../ui';
+import { Card, CardTitle, EmptyMessage, StatCard, TableWrapper, TableHead, TableBody } from '../../ui';
 import { SubjectPerformanceChart } from '../../charts/SubjectPerformanceChart';
 import { useAcademicRisk } from './useAcademicRisk';
 import { maxScoreFor } from '../../../lib/grades';
@@ -25,17 +25,6 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
   institution, totals, subjectData, lowPerfSubjects,
 }) => {
   const { anio, riskByGrade, topByGrade, loading, error } = useAcademicRisk();
-
-  const exportTable = () => ({
-    title: 'Rendimiento por Materia',
-    headers: ['Materia', 'Promedio', 'Estado'],
-    rows: lowPerfSubjects.map(s => [
-      s.nombre,
-      s.promedio,
-      s.deficit ? `Bajo la mínima (${institution?.nota_minima_aprobacion})` : 'Aceptable',
-    ]),
-    fileName: 'rendimiento_materias',
-  });
 
   const yearBadge = (clase: string) =>
     anio ? <span className={`text-[11px] font-semibold ${clase} px-2 py-0.5 rounded-full`}>{anio}</span> : null;
@@ -176,11 +165,10 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
       </div>
 
       <Card>
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+        <div className="mb-4">
           <CardTitle icon={<ShieldAlert className="h-5 w-5 text-amber-500" />} className="">
             Materias con Rendimiento Deficiente
           </CardTitle>
-          <div className="shrink-0"><ExportButtons build={exportTable} /></div>
         </div>
 
         {lowPerfSubjects.length === 0 ? (

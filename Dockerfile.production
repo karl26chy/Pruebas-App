@@ -1,6 +1,6 @@
 # ============================================================
 #  Plataforma Educativa — contenedor único de producción
-#  Frontend React/Vite compilado + Backend Express + Tectonic
+#  Frontend React/Vite compilado + Backend Express
 #  Contexto de build: raíz del repositorio (.)
 # ============================================================
 
@@ -17,7 +17,6 @@ FROM node:20-alpine
 WORKDIR /app
 
 ENV NODE_ENV=production
-ENV TECTONIC_CACHE_DIR=/opt/tectonic-cache
 
 # Backend (misma estructura que api/Dockerfile)
 COPY api/package.json api/package-lock.json ./
@@ -27,7 +26,6 @@ COPY api/schema.sql ./
 COPY api/src ./src
 COPY api/scripts ./scripts
 COPY api/assets ./assets
-RUN ./scripts/install-tex.sh
 
 # Frontend compilado (desde Stage 1)
 COPY --from=frontend-build /app/dist ./client/dist

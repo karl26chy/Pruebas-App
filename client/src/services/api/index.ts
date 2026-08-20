@@ -42,11 +42,9 @@ export const api = {
   login: authApi.login,
   getMe: authApi.getMe,
 
-  // Reportes / boletines
+  // Reportes / boletines (JSON para Excel)
   getStudentReport: reportApi.getStudentReport,
   getStudentYearReport: reportApi.getStudentYearReport,
-  downloadBoletinPDF: reportApi.downloadBoletinPDF,
-  getReportTemplates: reportApi.getReportTemplates,
 
   // Academic history
   getStudentAcademicHistory: (

@@ -2,9 +2,8 @@ import * as XLSX from 'xlsx';
 import type { AcademicReportData } from '../types';
 
 /**
- * Plantilla DEFAULT del boletín POR PERÍODO en Excel (SheetJS).
+ * Boletín POR PERÍODO en Excel (SheetJS).
  * Consume exactamente AcademicReportData; no recalcula nada.
- * Evoluciona de forma independiente del renderer PDF (LaTeX).
  */
 export function renderBoletinPeriodExcel(data: AcademicReportData) {
   const per = data.period;

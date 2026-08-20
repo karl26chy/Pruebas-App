@@ -1,21 +1,19 @@
 import React, { useState } from 'react';
-import { Building2, BookOpen, Link2, Palette, Users } from 'lucide-react';
+import { Building2, BookOpen, Link2, Users } from 'lucide-react';
 import { StatCard, Tabs, type TabItem } from '../../ui';
 import { useSuperAdmin } from './useSuperAdmin';
 import { InstitutionsTab } from './InstitutionsTab';
 import { UsersTab } from './UsersTab';
 import { GradesSubjectsTab } from './GradesSubjectsTab';
 import { AssignmentsTab } from './AssignmentsTab';
-import { ReportTemplatesTab } from './ReportTemplatesTab';
 
-type SuperAdminTab = 'institutions' | 'users' | 'grades_subjects' | 'assignments' | 'report_templates';
+type SuperAdminTab = 'institutions' | 'users' | 'grades_subjects' | 'assignments';
 
 const TABS: TabItem<SuperAdminTab>[] = [
   { id: 'institutions', label: 'Instituciones', icon: <Building2 className="h-4 w-4" /> },
   { id: 'users', label: 'Usuarios', icon: <Users className="h-4 w-4" /> },
   { id: 'grades_subjects', label: 'Grados y Materias', icon: <BookOpen className="h-4 w-4" /> },
   { id: 'assignments', label: 'Asignaciones', icon: <Link2 className="h-4 w-4" /> },
-  { id: 'report_templates', label: 'Formatos de Boletín', icon: <Palette className="h-4 w-4" /> },
 ];
 
 export const SuperAdminDashboard: React.FC = () => {
@@ -87,10 +85,6 @@ export const SuperAdminDashboard: React.FC = () => {
           showMsg={showMsg}
           onChanged={refreshData}
         />
-      )}
-
-      {activeTab === 'report_templates' && (
-        <ReportTemplatesTab showMsg={showMsg} />
       )}
     </div>
   );
