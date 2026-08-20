@@ -283,6 +283,12 @@ export async function getYearReport(user, studentId, anio) {
     const definitiva = valoraciones.length > 0
       ? Number((valoraciones.reduce((a, b) => a + b, 0) / valoraciones.length).toFixed(2))
       : null;
+    const estado =
+      definitiva === null
+        ? 'Sin notas'
+        : definitiva >= notaMinima
+          ? 'Aprobado'
+          : 'Reprobado';
     return {
       materia_id: materiaId,
       materia: subjectMeta[materiaId].materia,
@@ -290,6 +296,7 @@ export async function getYearReport(user, studentId, anio) {
       porPeriodo,
       definitiva,
       desempenoDefinitiva: desempeno(definitiva, escalaMaxima),
+      estado,
     };
   });
 

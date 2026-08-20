@@ -98,11 +98,13 @@ export const BoletinModal: React.FC<BoletinModalProps> = ({ student, onClose }) 
   };
 
   const descargarPDF = async () => {
-    if (!selection || selection.mode !== 'period') return setError('Selecciona un período para el PDF.');
+    if (!selection) return setError('Selecciona un período académico para el PDF.');
+    const anio = selection.mode === 'all' ? selection.anio : selectedYear || new Date().getFullYear();
+    if (!anio) return setError('Selecciona un año para el PDF.');
     setBusy('pdf');
     setError(null);
     try {
-      const url = `${API_BASE}/students/${encodeURIComponent(student.id)}/report/pdf?period_id=${encodeURIComponent(selection.periodId)}`;
+      const url = `${API_BASE}/students/${encodeURIComponent(student.id)}/report/pdf?anio=${encodeURIComponent(anio)}`;
       const token = getAuthToken();
       let response: Response;
       try {
@@ -123,7 +125,7 @@ export const BoletinModal: React.FC<BoletinModalProps> = ({ student, onClose }) 
       }
       const blob = await response.blob();
       const disposition = response.headers.get('Content-Disposition');
-      let filename = `boletin_${selection.periodId}.pdf`;
+      let filename = `boletin_${anio}.pdf`;
       if (disposition) {
         const m = /filename\*=(?:UTF-8''|")([^";]+)"/i.exec(disposition) || /filename=([^;]+)/i.exec(disposition);
         if (m) filename = m[1].replace(/^"|"$/g, '');
@@ -239,8 +241,7 @@ export const BoletinModal: React.FC<BoletinModalProps> = ({ student, onClose }) 
         </button>
         <button
           type="button"
-          disabled={!selection || busy !== null || selection.mode === 'all'}
-          title={selection?.mode === 'all' ? 'PDF solo por período' : undefined}
+          disabled={!selection || busy !== null}
           onClick={() => descargarPDF()}
           className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-q10-600 hover:bg-q10-700 text-white font-semibold text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
         >

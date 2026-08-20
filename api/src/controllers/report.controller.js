@@ -18,14 +18,14 @@ export async function getReport(req, res, next) {
 export async function getReportPDF(req, res, next) {
   try {
     const { studentId } = req.params;
-    const { period_id } = req.query;
-    if (!period_id) {
-      return res.status(400).json({ error: 'Falta period_id.' });
+    const { anio } = req.query;
+    if (!anio) {
+      return res.status(400).json({ error: 'Falta anio.' });
     }
     const institucionId = req.user?.institucion_id;
-    const buffer = await reportPdfService.renderReportPDF(studentId, period_id, institucionId);
+    const buffer = await reportPdfService.renderReportPDF(studentId, anio, institucionId);
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="boletin_${period_id}.pdf"`);
+    res.setHeader('Content-Disposition', `attachment; filename="boletin_${anio}.pdf"`);
     res.send(buffer);
   } catch (err) {
     next(err);
