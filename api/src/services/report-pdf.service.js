@@ -31,7 +31,7 @@ export async function renderReportPDF(studentId, anio, institucionId) {
   }
 
   const fechaGeneracion = new Date().toLocaleDateString('es-CO');
-  const observaciones = '';
+  const observaciones = data.observaciones || '';
 
   const htmlBody = Handlebars.compile(entry.html)({
     student: data.student,

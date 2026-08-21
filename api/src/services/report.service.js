@@ -1,6 +1,7 @@
 import { HttpError } from '../shared/http-error.js';
 import { periodById, findRaw } from '../repositories/resource.repository.js';
 import * as repo from '../repositories/report.repository.js';
+import pool from '../db/pool.js';
 
 /**
  * Reporte académico.
@@ -267,38 +268,68 @@ export async function getYearReport(user, studentId, anio) {
     }
   }
 
-  const subjects = Object.keys(subjectMeta).map(materiaId => {
-    const porPeriodo = periods.map((period, i) => {
-      const dato = (perPeriodBySubject[materiaId] || []).find(d => d.index === i);
+  // Logros: por assignment (materia+grado) y período más reciente con texto
+  // Mapa assignment por materia_id para este grado
+  const assignmentByMateria = {};
+  if (grade) {
+    const { rows: assignRows } = await pool.query(
+      `SELECT id, materia_id FROM assignments WHERE grado_id = $1`,
+      [grade.id]
+    );
+    for (const a of assignRows) assignmentByMateria[a.materia_id] = a.id;
+  }
+
+  const subjects = await Promise.all(
+    Object.keys(subjectMeta).map(async materiaId => {
+      const porPeriodo = periods.map((period, i) => {
+        const dato = (perPeriodBySubject[materiaId] || []).find(d => d.index === i);
+        return {
+          period_id: period.id,
+          numero: period.numero,
+          valoracion: dato ? dato.valoracion : null,
+          desempeno: dato ? dato.desempeno : null,
+          fallas: dato ? dato.fallas : null,
+          justificadas: dato ? dato.justificadas : null,
+        };
+      });
+      const valoraciones = porPeriodo.map(p => p.valoracion).filter(v => v !== null && v !== undefined);
+      const definitiva = valoraciones.length > 0
+        ? Number((valoraciones.reduce((a, b) => a + b, 0) / valoraciones.length).toFixed(2))
+        : null;
+      const estado =
+        definitiva === null
+          ? 'Sin notas'
+          : definitiva >= notaMinima
+            ? 'Aprobado'
+            : 'Reprobado';
+
+      // Logro más reciente (mayor numero) con texto
+      let logros = null;
+      const assignmentId = assignmentByMateria[materiaId];
+      if (assignmentId) {
+        const periodsDesc = [...periods].sort((a, b) => Number(b.numero) - Number(a.numero));
+        for (const p of periodsDesc) {
+          const { rows } = await pool.query(
+            `SELECT texto FROM subject_achievements WHERE assignment_id = $1 AND periodo_id = $2`,
+            [assignmentId, p.id]
+          );
+          const txt = rows[0]?.texto?.trim();
+          if (txt) { logros = txt; break; }
+        }
+      }
+
       return {
-        period_id: period.id,
-        numero: period.numero,
-        valoracion: dato ? dato.valoracion : null,
-        desempeno: dato ? dato.desempeno : null,
-        fallas: dato ? dato.fallas : null,
-        justificadas: dato ? dato.justificadas : null,
+        materia_id: materiaId,
+        materia: subjectMeta[materiaId].materia,
+        docente: subjectMeta[materiaId].docente,
+        porPeriodo,
+        definitiva,
+        desempenoDefinitiva: desempeno(definitiva, escalaMaxima),
+        estado,
+        logros,
       };
-    });
-    const valoraciones = porPeriodo.map(p => p.valoracion).filter(v => v !== null && v !== undefined);
-    const definitiva = valoraciones.length > 0
-      ? Number((valoraciones.reduce((a, b) => a + b, 0) / valoraciones.length).toFixed(2))
-      : null;
-    const estado =
-      definitiva === null
-        ? 'Sin notas'
-        : definitiva >= notaMinima
-          ? 'Aprobado'
-          : 'Reprobado';
-    return {
-      materia_id: materiaId,
-      materia: subjectMeta[materiaId].materia,
-      docente: subjectMeta[materiaId].docente,
-      porPeriodo,
-      definitiva,
-      desempenoDefinitiva: desempeno(definitiva, escalaMaxima),
-      estado,
-    };
-  });
+    })
+  );
 
   // Asistencia anual: suma de los períodos.
   const attendance = periodsData.reduce(
@@ -321,6 +352,20 @@ export async function getYearReport(user, studentId, anio) {
       ? Number((definitivas.reduce((a, b) => a + b, 0) / definitivas.length).toFixed(2))
       : null;
 
+  // Observación más reciente del estudiante con texto
+  let observaciones = '';
+  {
+    const periodsDesc = [...periods].sort((a, b) => Number(b.numero) - Number(a.numero));
+    for (const p of periodsDesc) {
+      const { rows } = await pool.query(
+        `SELECT texto FROM student_observations WHERE estudiante_id = $1 AND periodo_id = $2`,
+        [studentId, p.id]
+      );
+      const txt = rows[0]?.texto?.trim();
+      if (txt) { observaciones = txt; break; }
+    }
+  }
+
   return {
     student: buildStudentBlock(student),
     institution: buildInstitutionBlock(institution, config),
@@ -329,6 +374,7 @@ export async function getYearReport(user, studentId, anio) {
     periods: periodsData,
     subjects,
     attendance,
+    observaciones,
     summary: {
       promediosPeriodo,
       desempenosPeriodo,

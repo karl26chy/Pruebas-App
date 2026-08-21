@@ -227,3 +227,27 @@ CREATE TABLE IF NOT EXISTS institution_report_configs (
 CREATE INDEX IF NOT EXISTS idx_report_configs_institucion ON institution_report_configs("institucion_id");
 CREATE UNIQUE INDEX IF NOT EXISTS uq_report_configs_inst_tipo
   ON institution_report_configs("institucion_id", "tipo_documento");
+
+-- Logros por assignment + período (texto compartido por todo el grupo/materia)
+CREATE TABLE IF NOT EXISTS subject_achievements (
+  id TEXT PRIMARY KEY,
+  assignment_id TEXT NOT NULL REFERENCES assignments(id) ON DELETE CASCADE,
+  periodo_id TEXT NOT NULL REFERENCES academic_periods(id) ON DELETE CASCADE,
+  texto VARCHAR(1000) NOT NULL,
+  updated_by TEXT,
+  updated_at TEXT
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_subject_achievements_assign_periodo
+  ON subject_achievements(assignment_id, periodo_id);
+
+-- Observaciones por estudiante + período (una por estudiante, last-write-wins)
+CREATE TABLE IF NOT EXISTS student_observations (
+  id TEXT PRIMARY KEY,
+  estudiante_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  periodo_id TEXT NOT NULL REFERENCES academic_periods(id) ON DELETE CASCADE,
+  texto VARCHAR(1000) NOT NULL,
+  updated_by TEXT,
+  updated_at TEXT
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_student_observations_est_periodo
+  ON student_observations(estudiante_id, periodo_id);

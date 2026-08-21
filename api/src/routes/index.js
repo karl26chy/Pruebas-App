@@ -4,6 +4,8 @@ import academicHistoryRoutes from './academic-history.routes.js';
 import reportRoutes from './report.routes.js';
 import reportConfigRoutes from './report-config.routes.js';
 import reportTemplatesRoutes from './report-templates.routes.js';
+import achievementRoutes from './achievement.routes.js';
+import observationRoutes from './observation.routes.js';
 import resourceRoutes from './resource.routes.js';
 
 const router = express.Router();
@@ -19,6 +21,8 @@ router.use('/', academicHistoryRoutes);
 router.use('/', reportRoutes);
 router.use('/', reportConfigRoutes);
 router.use('/', reportTemplatesRoutes);
+router.use('/', achievementRoutes);
+router.use('/', observationRoutes);
 router.use('/', resourceRoutes);
 
 export default router;

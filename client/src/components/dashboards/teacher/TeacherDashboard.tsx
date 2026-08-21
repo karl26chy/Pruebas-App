@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Award, AlertTriangle, CheckSquare, ClipboardList, Lock, Mail } from 'lucide-react';
+import { Award, AlertTriangle, CheckSquare, ClipboardList, Lock, Mail, Star, MessageSquare } from 'lucide-react';
 import { useApp } from '../../../context/useApp';
 import { useMessaging } from '../../../hooks/useMessaging';
 import { Card, EmptyMessage, Field, INPUT, Tabs, type TabItem } from '../../ui';
@@ -10,8 +10,10 @@ import { AttendanceTab } from './AttendanceTab';
 import { EvaluationsTab } from './EvaluationsTab';
 import { MarksTab } from './MarksTab';
 import { CitationsTab } from './CitationsTab';
+import { LogrosTab } from './LogrosTab';
+import { ObservacionesTab } from './ObservacionesTab';
 
-type TeacherTab = 'attendance' | 'evaluations' | 'marks' | 'citations' | 'messages';
+type TeacherTab = 'attendance' | 'evaluations' | 'marks' | 'achievements' | 'observations' | 'citations' | 'messages';
 
 export const TeacherDashboard: React.FC = () => {
   const { refreshData, navigateToTab, setNavigateToTab } = useApp();
@@ -41,6 +43,8 @@ export const TeacherDashboard: React.FC = () => {
     { id: 'attendance', label: 'Asistencia', icon: <CheckSquare className="h-4 w-4" /> },
     { id: 'evaluations', label: 'Evaluaciones', icon: <ClipboardList className="h-4 w-4" /> },
     { id: 'marks', label: 'Notas', icon: <Award className="h-4 w-4" /> },
+    { id: 'achievements', label: 'Logros', icon: <Star className="h-4 w-4" /> },
+    { id: 'observations', label: 'Observaciones', icon: <MessageSquare className="h-4 w-4" /> },
     { id: 'citations', label: 'Citaciones', icon: <AlertTriangle className="h-4 w-4" /> },
     { id: 'messages', label: 'Mensajería', icon: <Mail className="h-4 w-4" />, badge: messaging.unreadIncoming },
   ];
@@ -165,6 +169,14 @@ export const TeacherDashboard: React.FC = () => {
               periodLabel={periodLabel(activePeriod)}
               onSaved={refreshData}
             />
+          )}
+
+          {activeTab === 'achievements' && (
+            <LogrosTab assignment={activeAssignment} period={activePeriod} />
+          )}
+
+          {activeTab === 'observations' && (
+            <ObservacionesTab students={gradeStudents} period={activePeriod} />
           )}
 
           {activeTab === 'citations' && (
