@@ -223,7 +223,12 @@ export const AssignmentsTab: React.FC<AssignmentsTabProps> = ({
               <select required value={studentId} onChange={e => setStudentId(e.target.value)} className={INPUT}>
                 <option value="">-- Seleccionar --</option>
                 {users
-                  .filter(u => u.rol === 'student' && u.institucion_id === studInstId)
+                  .filter(
+                    u =>
+                      u.rol === 'student' &&
+                      u.institucion_id === studInstId &&
+                      !studentGrades.some(sg => sg.estudiante_id === u.id)
+                  )
                   .map(s => <option key={s.id} value={s.id}>{s.nombre} {s.apellido}</option>)}
               </select>
             </Field>

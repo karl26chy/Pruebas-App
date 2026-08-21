@@ -28,7 +28,9 @@ export const AsignacionesTab: React.FC = () => {
   const instId = user?.institucion_id;
 
   const misDocentes = users.filter(u => u.rol === 'teacher' && u.institucion_id === instId);
-  const misEstudiantes = users.filter(u => u.rol === 'student' && u.institucion_id === instId);
+  const misEstudiantes = users.filter(
+    u => u.rol === 'student' && u.institucion_id === instId && !studentGrades.some(sg => sg.estudiante_id === u.id)
+  );
   const misMaterias = subjects.filter(s => s.institucion_id === instId);
   const misGrados = grades.filter(g => g.institucion_id === instId);
   const misAsignaciones = assignments.filter(a => a.institucion_id === instId);
